@@ -1,7 +1,7 @@
 //! TomTom Orbis live congestion tiles. Explicit API key required; no fake roads.
 use image::{RgbaImage, imageops};
 use std::{
-    sync::mpsc,
+    sync::{Arc, mpsc},
     time::{Duration, Instant},
 };
 const UPDATE_INTERVAL: Duration = Duration::from_secs(120);
@@ -47,62 +47,48 @@ pub struct TrafficQuery<'a> {
 
 #[derive(Default)]
 pub struct LiveTraffic {
-    tiles: Option<TrafficTiles>,
+    tiles: Option<Arc<TrafficTiles>>,
     rx: Option<mpsc::Receiver<Result<TrafficTiles, crate::Error>>>,
     attempt: Option<Instant>,
-    error: Option<String>,
+    error: Option<crate::Error>,
     last_key: String,
+    pending_key: Option<String>,
     requested: Option<(u32, i64, i64)>,
     generation: u64,
 }
 impl LiveTraffic {
     pub fn tiles(&self) -> Option<&TrafficTiles> {
         self.tiles
-            .as_ref()
+            .as_deref()
             .filter(|t| t.loaded.elapsed() <= Duration::from_secs(15 * 60))
+    }
+    pub fn shared_tiles(&self) -> Option<Arc<TrafficTiles>> {
+        self.tiles().and_then(|_| self.tiles.clone())
     }
     pub fn generation(&self) -> u64 {
         self.generation
     }
-    pub fn status(&self, key: &str, altitude: f64, pt: bool) -> String {
+    pub fn status(
+        &self,
+        key: &str,
+        altitude: f64,
+        lang: earthcraft_core::language::Lang,
+    ) -> String {
         if key.trim().is_empty() {
-            return if pt {
-                "Insira uma chave TomTom para tráfego real"
-            } else {
-                "Enter a TomTom key for real traffic"
-            }
-            .into();
+            return lang.text("traffic-key-help").into();
         }
         if altitude > MAX_TRAFFIC_ALTITUDE_KM {
-            return if pt {
-                "Aproxime o mapa para mostrar o trânsito"
-            } else {
-                "Zoom in to see traffic"
-            }
-            .into();
+            return lang.text("traffic-zoom-help").into();
         }
-        if let Some(e) = &self.error {
-            return format!("TomTom: {e}");
+        if let Some(error) = &self.error {
+            return format!("TomTom: {error}");
         }
-        if let Some(t) = self.tiles() {
-            if pt {
-                format!(
-                    "Tráfego atualizado há {} min (verde=livre, amarelo=lento, vermelho=congestionado)",
-                    t.loaded.elapsed().as_secs() / 60
-                )
-            } else {
-                format!(
-                    "Traffic updated {} min ago (green=free, yellow=slow, red=jammed)",
-                    t.loaded.elapsed().as_secs() / 60
-                )
-            }
-        } else {
-            if pt {
-                "Carregando tráfego real…"
-            } else {
-                "Loading live traffic…"
-            }
-            .into()
+        match self.tiles() {
+            Some(tiles) => lang.format(
+                "traffic-loaded-status",
+                &[("minutes", (tiles.loaded.elapsed().as_secs() / 60).into())],
+            ),
+            None => lang.text("traffic-loading-status").into(),
         }
     }
     pub fn update(
@@ -118,40 +104,15 @@ impl LiveTraffic {
             longitude: lon,
             altitude_km: alt,
         } = query;
-        if let Some(rx) = &self.rx {
-            match rx.try_recv() {
-                Ok(Ok(t)) => {
-                    self.tiles = Some(t);
-                    self.error = None;
-                    self.generation += 1;
-                    self.rx = None;
-                }
-                Ok(Err(e)) => {
-                    self.error = Some(e.to_string());
-                    self.rx = None;
-                }
-                Err(mpsc::TryRecvError::Disconnected) => {
-                    self.error = Some("TomTom disconnected".into());
-                    self.rx = None;
-                }
-                Err(mpsc::TryRecvError::Empty) => {}
-            }
-        }
         let key = key.trim();
+        self.set_key(key);
+        self.poll(key);
         if !enabled || key.is_empty() || alt > MAX_TRAFFIC_ALTITUDE_KM || lat.abs() >= 85.0 {
             return;
         }
         let zoom = zoom_for_altitude(alt);
         let (x, y) = center_tile(lat, lon, zoom);
         let center = (zoom, x, y);
-        if self.last_key != key {
-            self.tiles = None;
-            self.last_key = key.to_owned();
-            self.requested = None;
-            self.attempt = None;
-            self.error = None;
-            self.generation += 1;
-        }
         let moving = self.requested != Some(center);
         let due = self.attempt.is_none_or(|a| {
             a.elapsed()
@@ -168,11 +129,44 @@ impl LiveTraffic {
             self.attempt = Some(Instant::now());
             let (tx, rx) = mpsc::channel();
             self.rx = Some(rx);
+            self.pending_key = Some(key.to_owned());
             let key = key.to_owned();
             runtime.spawn(async move {
                 let _ = tx.send(download(zoom, x, y, key).await);
                 repaint();
             });
+        }
+    }
+    fn set_key(&mut self, key: &str) {
+        if self.last_key != key {
+            self.tiles = None;
+            self.last_key = key.to_owned();
+            self.requested = None;
+            self.attempt = None;
+            self.error = None;
+            self.generation += 1;
+        }
+    }
+    fn poll(&mut self, key: &str) {
+        let Some(receiver) = &self.rx else {
+            return;
+        };
+        let result = match receiver.try_recv() {
+            Ok(result) => result,
+            Err(mpsc::TryRecvError::Empty) => return,
+            Err(mpsc::TryRecvError::Disconnected) => Err("TomTom disconnected".into()),
+        };
+        self.rx = None;
+        if self.pending_key.take().as_deref() != Some(key) {
+            return;
+        }
+        match result {
+            Ok(tiles) => {
+                self.tiles = Some(Arc::new(tiles));
+                self.error = None;
+                self.generation += 1;
+            }
+            Err(error) => self.error = Some(error),
         }
     }
 }
@@ -189,11 +183,10 @@ fn center_tile(lat: f64, lon: f64, zoom: u32) -> (i64, i64) {
 }
 async fn download(zoom: u32, x: i64, y: i64, key: String) -> Result<TrafficTiles, crate::Error> {
     let client = crate::http::client(crate::http::Policy::Radar)?;
-    let mut image = RgbaImage::new(768, 768);
     let n = 1i64 << zoom;
     let left = x - 1;
     let top = (y - 1).clamp(0, n - 1);
-    let mut received = 0;
+    let mut decoded = Vec::with_capacity(9);
     let mut tasks = tokio::task::JoinSet::new();
     for iy in 0..3 {
         for ix in 0..3 {
@@ -212,7 +205,11 @@ async fn download(zoom: u32, x: i64, y: i64, key: String) -> Result<TrafficTiles
                     crate::http::body(client.get(url).header("TomTom-Api-Key", key), 350_000)
                         .await
                         .ok()?;
-                let tile = image::load_from_memory(&bytes).ok()?.to_rgba8();
+                let tile = crate::cpu::run(crate::cpu::Service::Tiles, move || {
+                    Ok(image::load_from_memory(&bytes)?.to_rgba8())
+                })
+                .await
+                .ok()?;
                 Some((ix, iy, tile))
             });
         }
@@ -222,22 +219,28 @@ async fn download(zoom: u32, x: i64, y: i64, key: String) -> Result<TrafficTiles
             && img.width() == 256
             && img.height() == 256
         {
-            imageops::overlay(&mut image, &img, ix * 256, iy * 256);
-            received += 1;
+            decoded.push((ix, iy, img));
         }
     }
-    if received == 0 {
+    if decoded.is_empty() {
         return Err(
             "No live traffic tiles (invalid key, rate limit or provider unavailable)".into(),
         );
     }
-    Ok(TrafficTiles {
-        image,
-        zoom,
-        left_x: left,
-        top_y: top,
-        loaded: Instant::now(),
+    crate::cpu::run(crate::cpu::Service::Features, move || {
+        let mut image = RgbaImage::new(768, 768);
+        for (ix, iy, tile) in decoded {
+            imageops::overlay(&mut image, &tile, ix * 256, iy * 256);
+        }
+        Ok(TrafficTiles {
+            image,
+            zoom,
+            left_x: left,
+            top_y: top,
+            loaded: Instant::now(),
+        })
     })
+    .await
 }
 #[cfg(test)]
 mod tests {
@@ -258,5 +261,62 @@ mod tests {
         assert!(t.sample(-80.0, 0.0).is_some());
         assert!(t.sample(80.0, 0.0).is_none());
         assert!(t.sample(-85.0, 0.0).is_none());
+    }
+}
+
+#[cfg(test)]
+mod refresh_tests {
+    use super::*;
+    fn tiles() -> TrafficTiles {
+        TrafficTiles {
+            image: RgbaImage::new(768, 768),
+            zoom: 2,
+            left_x: 1,
+            top_y: 1,
+            loaded: Instant::now(),
+        }
+    }
+    #[test]
+    fn changed_or_cleared_keys_discard_old_completions_and_keep_one_pending_request() {
+        let mut traffic = LiveTraffic::default();
+        traffic.set_key("first");
+        let (send, receive) = mpsc::channel();
+        traffic.rx = Some(receive);
+        traffic.pending_key = Some("first".into());
+        traffic.set_key("second");
+        assert!(traffic.rx.is_some());
+        send.send(Ok(tiles())).unwrap();
+        traffic.poll("second");
+        assert!(traffic.tiles().is_none());
+        assert!(traffic.rx.is_none());
+        let (send, receive) = mpsc::channel();
+        traffic.rx = Some(receive);
+        traffic.pending_key = Some("second".into());
+        send.send(Ok(tiles())).unwrap();
+        traffic.poll("second");
+        let shared = traffic.shared_tiles().unwrap();
+        assert!(Arc::ptr_eq(&shared, &traffic.shared_tiles().unwrap()));
+        traffic.set_key("");
+        assert!(traffic.tiles().is_none());
+        assert_eq!(shared.image.dimensions(), (768, 768));
+    }
+    #[test]
+    fn current_errors_keep_typed_causes_and_stale_errors_are_ignored() {
+        for (response_key, accept) in [("current", true), ("old", false)] {
+            let mut traffic = LiveTraffic::default();
+            let (send, receive) = mpsc::channel();
+            traffic.rx = Some(receive);
+            traffic.pending_key = Some(response_key.into());
+            send.send(Err(std::io::Error::from(
+                std::io::ErrorKind::PermissionDenied,
+            )
+            .into()))
+                .unwrap();
+            traffic.poll("current");
+            assert_eq!(traffic.error.is_some(), accept);
+            if accept {
+                assert!(matches!(traffic.error, Some(crate::Error::Io(_))));
+            }
+        }
     }
 }

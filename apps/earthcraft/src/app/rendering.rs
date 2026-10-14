@@ -13,6 +13,7 @@ struct PreparedFrame {
     image: egui::ColorImage,
     overlays: Option<Arc<earthcraft_render::overlays::OverlayGeometry>>,
     aircraft: Option<Arc<earthcraft_render::aircraft::AircraftGeometry>>,
+    live_layers: Option<Arc<earthcraft_render::live_layers::LiveGeometry>>,
 }
 
 pub(super) struct Renderer {
@@ -32,6 +33,7 @@ impl Renderer {
             earthcraft_render::backend::BackendPreference::from_environment(),
         );
         let mut overlay_preparer = earthcraft_render::overlays::OverlayPreparer::default();
+        let mut live_preparer = earthcraft_render::live_layers::LivePreparer::default();
         let mut aircraft_preparer = earthcraft_render::aircraft::AircraftPreparer::default();
         Self {
             worker: RenderWorker::with_prepare(
@@ -68,6 +70,10 @@ impl Renderer {
                     PreparedFrame {
                         image,
                         overlays: geometry,
+                        live_layers: request.live_layers.clone().map(|mut input| {
+                            input.unix_secs = now_unix();
+                            live_preparer.prepare(input)
+                        }),
                         aircraft: request.aircraft.clone().map(|mut input| {
                             input.unix_secs = now_unix();
                             aircraft_preparer.prepare(input)
@@ -163,6 +169,11 @@ impl App {
             aircraft: (self.show_flights
                 && self.explorer.active == earthcraft_core::body::Body::Earth)
                 .then(|| self.aircraft_input(basis, rect, self.cam.alt, pixels_per_point)),
+            live_layers: (self.show_roads
+                || self.show_traffic
+                || self.show_vessels
+                || self.show_satellites)
+                .then(|| self.live_layer_input(basis, rect, self.cam, pixels_per_point)),
             overlays: Some(earthcraft_render::overlays::OverlayInput {
                 view: earthcraft_render::overlays::OverlayView {
                     basis,
@@ -199,7 +210,11 @@ impl App {
             image: img,
             overlays,
             aircraft,
+            live_layers,
         } = frame.prepared;
+        if let Some(geometry) = live_layers {
+            self.live_geometry.accept(geometry);
+        }
         if let Some(geometry) = aircraft
             && Arc::ptr_eq(&geometry.data, &self.live_aircraft.snapshot())
             && geometry.view.map_scale == self.settings.map_scale

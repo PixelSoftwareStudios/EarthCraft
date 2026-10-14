@@ -1,5 +1,6 @@
 //! Hidden 3D-looking, rotatable *parody* disk under a procedurally starry sky.
 //! It does not change real-Earth geometry, navigation or geospatial layers.
+mod scene;
 use super::App;
 use earthcraft_core::language::Lang;
 use eframe::egui::{
@@ -12,6 +13,12 @@ const MAX_ZOOM: f32 = 4.0;
 const SECTORS: usize = 96;
 const RINGS: usize = 32;
 const STARS: usize = 340;
+const ROTATION_RADIANS_PER_POINT: f32 = 0.007;
+const ZOOM_EXPONENT_PER_POINT: f32 = 0.0015;
+const MIN_TILT_RADIANS: f32 = 0.12;
+const MAX_TILT_RADIANS: f32 = 1.55;
+const INITIAL_TILT_RADIANS: f32 = 0.62;
+const SCROLL_THRESHOLD_POINTS: f32 = 0.1;
 
 pub(super) struct FlatEarth {
     pub open: bool,
@@ -20,6 +27,9 @@ pub(super) struct FlatEarth {
     offset: Vec2,
     yaw: f32,
     tilt: f32,
+    scene: scene::Scene,
+    image_requested: bool,
+    pub(super) image_failed: bool,
 }
 
 impl Default for FlatEarth {
@@ -30,22 +40,31 @@ impl Default for FlatEarth {
             zoom: 1.0,
             offset: Vec2::ZERO,
             yaw: 0.0,
-            tilt: 0.62,
+            tilt: INITIAL_TILT_RADIANS,
+            scene: scene::Scene::default(),
+            image_requested: false,
+            image_failed: false,
         }
     }
 }
 
-// Parametric perspective of an azimuthal disk. 'height' makes the ice rim
-// visibly thick; changing yaw/tilt rotates the surface and side walls.
-fn disk_point(center: Pos2, radius: f32, yaw: f32, tilt: f32, x: f32, y: f32, height: f32) -> Pos2 {
-    let (sn, cs) = yaw.sin_cos();
-    let rx = x * cs - y * sn;
-    let ry = x * sn + y * cs;
-    Pos2::new(
-        center.x + radius * rx,
-        center.y + radius * (ry * tilt.sin() - height * tilt.cos()),
-    )
+impl FlatEarth {
+    pub(super) fn image_loaded(
+        &mut self,
+        ctx: &egui::Context,
+        image: earthcraft_data::files::LoadedImage,
+    ) {
+        self.image_failed = false;
+        let pixels = image.pixels;
+        let size = [pixels.width() as usize, pixels.height() as usize];
+        self.texture = Some(ctx.load_texture(
+            "earthcraft-secret-3d-disk",
+            ColorImage::from_rgba_unmultiplied(size, pixels.as_raw()),
+            egui::TextureOptions::LINEAR,
+        ));
+    }
 }
+
 fn hash01(i: u32) -> f32 {
     let mut a = i.wrapping_mul(747_796_405).wrapping_add(2_891_336_453);
     a = ((a >> ((a >> 28) + 4)) ^ a).wrapping_mul(277_803_737);
@@ -94,121 +113,54 @@ impl App {
         painter.rect_filled(rect, 0.0, Color32::from_rgb(2, 4, 18));
         self.cursor = None;
 
-        if self.flat_earth.texture.is_none()
-            && let Ok(img) = image::load_from_memory(ART)
-        {
-            let pixels = img.to_rgba8();
-            let size = [pixels.width() as usize, pixels.height() as usize];
-            self.flat_earth.texture = Some(ctx.load_texture(
-                "earthcraft-secret-3d-disk",
-                ColorImage::from_rgba_unmultiplied(size, pixels.as_raw()),
-                egui::TextureOptions::LINEAR,
-            ));
+        if !self.flat_earth.image_requested {
+            match self.file_jobs.load_image(
+                earthcraft_data::files::ImageTarget::FlatEarth,
+                earthcraft_data::files::ImageSource::Embedded(ART),
+            ) {
+                Ok(()) => self.flat_earth.image_requested = true,
+                Err(error) => self.status = format!("Flat Earth artwork request failed: {error}"),
+            }
         }
         if response.dragged() {
             let delta = ctx.input(|input| input.pointer.delta());
             if ctx.input(|i| i.modifiers.shift) {
                 self.flat_earth.offset += delta;
             } else {
-                self.flat_earth.yaw += delta.x * 0.007;
-                self.flat_earth.tilt = (self.flat_earth.tilt - delta.y * 0.007).clamp(0.12, 1.55);
+                self.flat_earth.yaw += delta.x * ROTATION_RADIANS_PER_POINT;
+                self.flat_earth.tilt = (self.flat_earth.tilt
+                    - delta.y * ROTATION_RADIANS_PER_POINT)
+                    .clamp(MIN_TILT_RADIANS, MAX_TILT_RADIANS);
             }
         }
         if response.hovered() {
             let scroll = ctx.input(|i| i.smooth_scroll_delta.y);
-            if scroll.abs() > 0.1 {
-                self.flat_earth.zoom =
-                    (self.flat_earth.zoom * (scroll * 0.0015).exp()).clamp(MIN_ZOOM, MAX_ZOOM);
+            if scroll.abs() > SCROLL_THRESHOLD_POINTS {
+                self.flat_earth.zoom = (self.flat_earth.zoom
+                    * (scroll * ZOOM_EXPONENT_PER_POINT).exp())
+                .clamp(MIN_ZOOM, MAX_ZOOM);
             }
         }
         if response.double_clicked() {
             self.flat_earth.zoom = 1.0;
             self.flat_earth.offset = Vec2::ZERO;
             self.flat_earth.yaw = 0.0;
-            self.flat_earth.tilt = 0.62;
+            self.flat_earth.tilt = INITIAL_TILT_RADIANS;
         }
 
-        // Deterministic three-dimensional-looking star field, no external assets.
-        for i in 0..STARS as u32 {
-            let x = rect.left() + rect.width() * hash01(i * 7 + 1);
-            let y = rect.top() + rect.height() * hash01(i * 7 + 2);
-            let depth = hash01(i * 7 + 3);
-            let alpha = 90 + (depth * 150.0) as u8;
-            let size = 0.35 + depth * 1.05;
-            painter.circle_filled(
-                Pos2::new(x, y),
-                size,
-                Color32::from_rgba_unmultiplied(205, 223, 255, alpha),
-            );
-        }
-        let center = rect.center() + self.flat_earth.offset + Vec2::new(0.0, rect.height() * 0.05);
-        let radius = (rect.width() * 0.31).min(rect.height() * 0.42) * self.flat_earth.zoom;
-        let (yaw, tilt) = (self.flat_earth.yaw, self.flat_earth.tilt);
-        let point = |x, y, z| disk_point(center, radius, yaw, tilt, x, y, z);
-
-        // A visible cylindrical icy rim gives the disk a solid silhouette.
-        // Back sections first, then textured surface, then front sections.
-        for j in 0..SECTORS {
-            let a = (j as f32 + 0.5) * std::f32::consts::TAU / SECTORS as f32;
-            let b = (j as f32 + 1.5) * std::f32::consts::TAU / SECTORS as f32;
-            let p = [
-                point(a.cos(), a.sin(), 0.0),
-                point(b.cos(), b.sin(), 0.0),
-                point(b.cos(), b.sin(), -0.10),
-                point(a.cos(), a.sin(), -0.10),
-            ];
-            painter.add(egui::Shape::convex_polygon(
-                p.to_vec(),
-                Color32::from_rgb(117, 181, 206),
-                egui::Stroke::NONE,
-            ));
-        }
-        if let Some(tex) = &self.flat_earth.texture {
-            // Project a genuinely triangulated textured disk (not a distorted rectangle).
-            // Polar-to-equirect UV: centre = northern pole, outer rim = Antarctica.
-            let mut mesh = egui::epaint::Mesh::with_texture(tex.id());
-            for ring in 0..RINGS {
-                let inner = ring as f32 / RINGS as f32;
-                let outer = (ring + 1) as f32 / RINGS as f32;
-                for sector in 0..SECTORS {
-                    let u0 = sector as f32 / SECTORS as f32;
-                    let u1 = (sector + 1) as f32 / SECTORS as f32;
-                    let t0 = u0 * std::f32::consts::TAU;
-                    let t1 = u1 * std::f32::consts::TAU;
-                    let start = mesh.vertices.len() as u32;
-                    for (r, u, a) in [
-                        (inner, u0, t0),
-                        (inner, u1, t1),
-                        (outer, u1, t1),
-                        (outer, u0, t0),
-                    ] {
-                        mesh.vertices.push(egui::epaint::Vertex {
-                            pos: point(r * a.cos(), r * a.sin(), 0.0),
-                            uv: Pos2::new(u, r),
-                            color: Color32::WHITE,
-                        });
-                    }
-                    mesh.indices.extend_from_slice(&[
-                        start,
-                        start + 1,
-                        start + 2,
-                        start,
-                        start + 2,
-                        start + 3,
-                    ]);
-                }
-            }
-            painter.add(egui::Shape::mesh(mesh));
-            let mut ice = Vec::with_capacity(SECTORS + 1);
-            for i in 0..=SECTORS {
-                let a = i as f32 * std::f32::consts::TAU / SECTORS as f32;
-                ice.push(point(a.cos(), a.sin(), 0.001));
-            }
-            painter.add(egui::Shape::line(
-                ice,
-                egui::Stroke::new(3.0 * self.flat_earth.zoom, Color32::from_rgb(228, 247, 255)),
-            ));
-        } else {
+        self.flat_earth.scene.draw(
+            &painter,
+            scene::View {
+                rect,
+                zoom: self.flat_earth.zoom,
+                offset: self.flat_earth.offset,
+                yaw: self.flat_earth.yaw,
+                tilt: self.flat_earth.tilt,
+                texture: self.flat_earth.texture.as_ref().map(TextureHandle::id),
+                pixels_per_point: ctx.pixels_per_point(),
+            },
+        );
+        if self.flat_earth.image_failed {
             painter.text(
                 rect.center(),
                 Align2::CENTER_CENTER,
@@ -293,12 +245,38 @@ mod tests {
         assert!(!state.open);
         assert_eq!(state.zoom, 1.0);
     }
+}
+
+#[cfg(test)]
+mod image_tests {
+    use super::*;
     #[test]
-    fn perspective_has_depth() {
-        let c = Pos2::new(100.0, 100.0);
-        assert_ne!(
-            disk_point(c, 100.0, 0.0, 0.6, 0.0, 1.0, 0.0),
-            disk_point(c, 100.0, 0.0, 0.6, 0.0, 1.0, -0.1)
-        );
+    fn embedded_image_uses_the_file_worker_and_completion_does_not_reopen_the_scene() {
+        use earthcraft_data::files::{FileJobs, FileOutcome, ImageSource, ImageTarget};
+        let runtime = earthcraft_data::runtime::ServiceRuntime::new().unwrap();
+        let (send, receive) = std::sync::mpsc::channel();
+        let (jobs, results) = FileJobs::new(runtime.handle(), move || {
+            let _ = send.send(());
+        });
+        jobs.load_image(ImageTarget::FlatEarth, ImageSource::Embedded(ART))
+            .unwrap();
+        let result = results
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        let FileOutcome::ImageLoaded {
+            target: ImageTarget::FlatEarth,
+            image,
+        } = result.result.unwrap()
+        else {
+            panic!("illustration image");
+        };
+        receive
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        let mut illustration = FlatEarth::default();
+        illustration.image_loaded(&egui::Context::default(), image);
+        assert!(!illustration.open);
+        assert!(illustration.texture.is_some());
+        assert!(!illustration.image_failed);
     }
 }

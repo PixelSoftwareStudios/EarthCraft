@@ -21,6 +21,7 @@ pub enum ImageTarget {
     Planet,
     Sky,
     Moon,
+    FlatEarth,
 }
 
 pub struct LoadedImage {

@@ -223,6 +223,7 @@ fn warm_gpu_frame_time() {
             },
             overlays: None,
             aircraft: None,
+            live_layers: None,
             presentation: 0,
         };
         let mut cpu_times = Vec::new();
@@ -352,6 +353,7 @@ fn warm_gpu_frame_time() {
             },
             overlays: None,
             aircraft: None,
+            live_layers: None,
             presentation: 0,
         };
         let frame = gpu

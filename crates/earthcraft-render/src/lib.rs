@@ -362,3 +362,5 @@ pub mod scale_bar;
 pub mod weather;
 
 pub mod view;
+
+pub mod live_layers;

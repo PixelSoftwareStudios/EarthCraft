@@ -7,6 +7,11 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     mpsc,
 };
+const WORLD_MAX_ALTITUDE_KM: f64 = 110.0;
+const WORLD_LATITUDE_LIMIT_DEG: f64 = 84.0;
+const WORLD_RETRY_SECS: u64 = 75;
+const WORLD_REFRESH_SECS: u64 = 600;
+const WORLD_MOVEMENT_DEG: f64 = 0.15;
 const NE: &str = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson";
 
 type Repaint = Arc<dyn Fn() + Send + Sync>;
@@ -27,6 +32,7 @@ pub struct BoundaryLoader {
     tx: mpsc::Sender<Patch>,
     log: StatusLog,
     active: Arc<AtomicUsize>,
+    world_active: Arc<AtomicUsize>,
     requests: BrazilRequests,
     world_requested: Option<(f64, f64)>,
     world_attempt: Option<std::time::Instant>,
@@ -62,21 +68,25 @@ impl BoundaryLoader {
     /// Worldwide city/municipal boundaries from OpenStreetMap, fetched only
     /// near the current camera. Existing official Brazilian IBGE outlines remain.
     pub fn request_world_cities(&mut self, enabled: bool, altitude_km: f64, lat: f64, lon: f64) {
-        if !enabled || altitude_km > 110.0 || lat.abs() >= 84.0 {
+        if !enabled
+            || self.is_loading_world_cities()
+            || altitude_km > WORLD_MAX_ALTITUDE_KM
+            || lat.abs() >= WORLD_LATITUDE_LIMIT_DEG
+        {
             return;
         }
         if self
             .world_attempt
-            .is_some_and(|t| t.elapsed().as_secs() < 75)
+            .is_some_and(|t| t.elapsed().as_secs() < WORLD_RETRY_SECS)
         {
             return;
         }
         if self.world_requested.is_some_and(|(a, b)| {
-            (lat - a).abs() < 0.15
-                && (lon - b).abs() < 0.15
+            (lat - a).abs() < WORLD_MOVEMENT_DEG
+                && (lon - b).abs() < WORLD_MOVEMENT_DEG
                 && self
                     .world_attempt
-                    .is_some_and(|t| t.elapsed().as_secs() < 600)
+                    .is_some_and(|t| t.elapsed().as_secs() < WORLD_REFRESH_SECS)
         }) {
             return;
         }
@@ -84,7 +94,7 @@ impl BoundaryLoader {
         self.world_attempt = Some(std::time::Instant::now());
         let tx = self.tx.clone();
         let log = self.log.clone();
-        let active = self.active.clone();
+        let active = self.world_active.clone();
         active.fetch_add(1, Ordering::Relaxed);
         let job = ActiveJob(active, self.repaint.clone());
         self.runtime.spawn(async move {
@@ -104,7 +114,13 @@ impl BoundaryLoader {
         });
     }
     pub fn is_loading(&self) -> bool {
+        self.is_loading_base_layers() || self.is_loading_world_cities()
+    }
+    pub fn is_loading_base_layers(&self) -> bool {
         self.active.load(Ordering::Relaxed) > 0
+    }
+    pub fn is_loading_world_cities(&self) -> bool {
+        self.world_active.load(Ordering::Relaxed) > 0
     }
     pub fn request_visible_layers(
         &mut self,
@@ -211,6 +227,7 @@ pub fn load_boundaries_async(
             tx,
             log,
             active,
+            world_active: Arc::new(AtomicUsize::new(0)),
             requests: BrazilRequests::default(),
             world_requested: None,
             world_attempt: None,
@@ -353,6 +370,7 @@ mod tests {
             tx,
             log: Arc::new(std::sync::Mutex::new(Vec::new())),
             active: Arc::new(AtomicUsize::new(0)),
+            world_active: Arc::new(AtomicUsize::new(0)),
             requests: BrazilRequests::default(),
             world_requested: None,
             world_attempt: None,
@@ -365,6 +383,13 @@ mod tests {
         assert_eq!(loader.take_request(true, false, true, 14000.0), Some(true));
         assert_eq!(loader.take_request(false, true, true, 100.0), None);
         assert!(!loader.is_loading());
+        loader.world_active.store(1, Ordering::Relaxed);
+        assert!(loader.is_loading());
+        assert!(loader.is_loading_world_cities());
+        assert!(!loader.is_loading_base_layers());
+        loader.request_world_cities(true, 100.0, 10.0, 20.0);
+        assert!(loader.world_attempt.is_none());
+        assert!(loader.world_requested.is_none());
     }
 }
 

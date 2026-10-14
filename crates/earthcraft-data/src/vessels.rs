@@ -2,9 +2,10 @@
 //! The network's real AIS reception is incomplete (especially far offshore).
 //! A custom licensed GeoJSON URL overrides this source; Finnish AIS is a fallback
 //! only when the public worldwide provider cannot be reached.
+use earthcraft_core::math::now_unix;
 use std::{
-    sync::mpsc,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    sync::{Arc, mpsc},
+    time::{Duration, Instant},
 };
 const WORLD_URL: &str = "https://api.openseafeed.com/v1/snapshot";
 const FINNISH_URL: &str = "https://meri.digitraffic.fi/api/ais/v1/locations";
@@ -31,17 +32,17 @@ enum Source {
     FinlandFallback,
 }
 struct VesselBatch {
-    vessels: Vec<Vessel>,
+    vessels: Arc<[Vessel]>,
     source: Source,
 }
 #[derive(Default)]
 pub struct LiveVessels {
-    current: Vec<Vessel>,
+    current: Arc<[Vessel]>,
     source: Source,
     loaded: Option<Instant>,
     attempt: Option<Instant>,
     rx: Option<mpsc::Receiver<Result<VesselBatch, crate::Error>>>,
-    error: Option<String>,
+    error: Option<crate::Error>,
 }
 impl LiveVessels {
     pub fn update(
@@ -60,7 +61,7 @@ impl LiveVessels {
                     self.rx = None;
                 }
                 Ok(Err(e)) => {
-                    self.error = Some(e.to_string());
+                    self.error = Some(e);
                     self.rx = None;
                 }
                 Err(mpsc::TryRecvError::Disconnected) => {
@@ -92,46 +93,22 @@ impl LiveVessels {
             &[]
         }
     }
-    pub fn status(&self, pt: bool) -> String {
-        if let Some(err) = &self.error {
-            return format!("AIS: {err}");
+    pub fn shared_snapshot(&self) -> Option<Arc<[Vessel]>> {
+        (!self.snapshot().is_empty()).then(|| self.current.clone())
+    }
+    pub fn status(&self, lang: earthcraft_core::language::Lang) -> String {
+        if let Some(error) = &self.error {
+            return format!("AIS: {error}");
         }
         if self.loaded.is_none() {
-            return if pt {
-                "Carregando navios AIS mundiais…"
-            } else {
-                "Loading worldwide AIS ships…"
-            }
-            .into();
+            return lang.text("vessels-loading-status").into();
         }
-        let count = self.snapshot().len();
-        match (self.source, pt) {
-            (Source::World, true) => format!(
-                "{count} navios • OpenSeaFeed mundial • cobertura parcial, observações até 90 min"
-            ),
-            (Source::World, false) => format!(
-                "{count} vessels • worldwide OpenSeaFeed • partial reception, reports up to 90 min old"
-            ),
-            (Source::Custom, true) => {
-                format!("{count} navios • GeoJSON AIS configurado • cobertura do fornecedor")
-            }
-            (Source::Custom, false) => {
-                format!("{count} vessels • custom AIS GeoJSON • provider coverage")
-            }
-            (Source::FinlandFallback, true) => format!(
-                "{count} navios • contingência Fintraffic (só Finlândia); fonte mundial indisponível"
-            ),
-            (Source::FinlandFallback, false) => format!(
-                "{count} vessels • Fintraffic fallback (Finland only); global feed unavailable"
-            ),
-        }
-    }
-    pub fn source_label(&self) -> &'static str {
-        match self.source {
-            Source::World => "OpenSeaFeed (mundial)",
-            Source::Custom => "GeoJSON AIS",
-            Source::FinlandFallback => "Digitraffic/Fintraffic (Finlândia)",
-        }
+        let id = match self.source {
+            Source::World => "vessels-world-status",
+            Source::Custom => "vessels-custom-status",
+            Source::FinlandFallback => "vessels-fallback-status",
+        };
+        lang.format(id, &[("count", self.snapshot().len().into())])
     }
 }
 async fn download() -> Result<VesselBatch, crate::Error> {
@@ -144,7 +121,10 @@ async fn download() -> Result<VesselBatch, crate::Error> {
             return Err("Custom AIS endpoint must return a GeoJSON FeatureCollection".into());
         }
         return Ok(VesselBatch {
-            vessels: parse_ais_geojson(&json, now_unix()),
+            vessels: crate::cpu::run(crate::cpu::Service::Features, move || {
+                Ok(parse_ais_geojson(&json, now_unix()).into())
+            })
+            .await?,
             source: Source::Custom,
         });
     }
@@ -152,7 +132,10 @@ async fn download() -> Result<VesselBatch, crate::Error> {
         && json["vessels"].is_array()
     {
         return Ok(VesselBatch {
-            vessels: parse_world_snapshot(&json, now_unix()),
+            vessels: crate::cpu::run(crate::cpu::Service::Features, move || {
+                Ok(parse_world_snapshot(&json, now_unix()).into())
+            })
+            .await?,
             source: Source::World,
         });
     }
@@ -161,7 +144,10 @@ async fn download() -> Result<VesselBatch, crate::Error> {
         return Err("No compatible worldwide or Finnish AIS feed".into());
     }
     Ok(VesselBatch {
-        vessels: parse_ais_geojson(&json, now_unix()),
+        vessels: crate::cpu::run(crate::cpu::Service::Features, move || {
+            Ok(parse_ais_geojson(&json, now_unix()).into())
+        })
+        .await?,
         source: Source::FinlandFallback,
     })
 }
@@ -173,12 +159,6 @@ async fn request_json(url: &str) -> Result<serde_json::Value, crate::Error> {
         .header("Accept-Encoding", "gzip");
     // Public fleet snapshots may be several MB; hard cap protects the application.
     crate::http::parse_json(crate::http::body(req, 40_000_000).await?).await
-}
-fn now_unix() -> f64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs_f64()
 }
 fn number(v: Option<&serde_json::Value>) -> Option<f64> {
     v.and_then(|x| {

@@ -222,3 +222,28 @@ Use different isolated capture directories for before and after versions. Compil
 each version with the same package/features/profile, save its executable, and
 alternate runs without concurrent builds. Workspace feature unification can
 produce a different test executable from the focused package command above.
+
+## Hidden illustration construction (2026-10-14)
+
+An isolated optimized-dev CPU comparison on macOS ARM64 measured seven rounds
+of 200 scene constructions at 800×600, yaw 1.2, tilt 0.62 and zoom 1.0.
+The baseline was the scene builder extracted from `432426f`; the current builder
+uses the same colors, draw order, rim, UVs and 6,144 triangles. Expanded triangle
+positions, UVs and colors matched exactly on this host for three rotation/tilt/
+zoom combinations. The permanent corner samples allow f32 libm rounding on other
+platforms. No original globe raster fixtures were regenerated.
+
+| CPU scene construction | Median per construction | Surface vertices |
+| --- | ---: | ---: |
+| Original | 72.679 µs | 12,288 |
+| Shared topology | 22.534 µs | 3,201 |
+
+These timings exclude GUI tessellation, texture upload, networking and frame
+presentation, and do not establish an application FPS gain. Stationary scenes
+also reuse tessellated meshes; cache identity/invalidation is tested headlessly.
+The original comparison helper was temporary and is not part of the source.
+Rerun the current production construction workload without concurrent builds:
+
+```sh
+CARGO_PROFILE_DEV_INCREMENTAL=false cargo test -p earthcraft flat_scene_construction_time --locked -- --ignored --nocapture --test-threads=1
+```

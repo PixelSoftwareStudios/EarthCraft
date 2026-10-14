@@ -2,13 +2,17 @@
 //! An intentionally small, throttled bounding box avoids abusive Overpass calls.
 use super::{Layer, Line, Patch};
 use std::sync::Arc;
+const REQUEST_RADIUS_DEG: f64 = 0.30;
+const MAX_RESPONSE_BYTES: u64 = 15_000_000;
+const MAX_ELEMENTS: usize = 3000;
+const LINE_ADMISSION_THRESHOLD: usize = 6000;
 
 pub(super) async fn load_osm_cities(lat: f64, lon: f64) -> Result<Patch, crate::Error> {
     // On-demand bounded geography, not a false promise of a global exhaustive file.
-    let lat0 = (lat - 0.30).clamp(-85.0, 85.0);
-    let lat1 = (lat + 0.30).clamp(-85.0, 85.0);
-    let lon0 = (lon - 0.30).max(-180.0);
-    let lon1 = (lon + 0.30).min(180.0);
+    let lat0 = (lat - REQUEST_RADIUS_DEG).clamp(-85.0, 85.0);
+    let lat1 = (lat + REQUEST_RADIUS_DEG).clamp(-85.0, 85.0);
+    let lon0 = (lon - REQUEST_RADIUS_DEG).max(-180.0);
+    let lon1 = (lon + REQUEST_RADIUS_DEG).min(180.0);
     let query = format!(
         "[out:json][timeout:20];(way[\"boundary\"=\"administrative\"][\"admin_level\"~\"^(8|9)$\"]({lat0:.4},{lon0:.4},{lat1:.4},{lon1:.4});relation[\"boundary\"=\"administrative\"][\"admin_level\"~\"^(8|9)$\"]({lat0:.4},{lon0:.4},{lat1:.4},{lon1:.4}););out geom;"
     );
@@ -17,11 +21,14 @@ pub(super) async fn load_osm_cities(lat: f64, lon: f64) -> Result<Patch, crate::
         client
             .post("https://overpass.kumi.systems/api/interpreter")
             .form(&[("data", query)]),
-        15_000_000,
+        MAX_RESPONSE_BYTES,
     )
     .await?;
     let v = crate::http::parse_json(bytes).await?;
-    let lines = parse_overpass(&v);
+    let lines = crate::cpu::run(crate::cpu::Service::Features, move || {
+        Ok(parse_overpass(&v))
+    })
+    .await?;
     Ok(Patch {
         layer: Layer::WorldCities,
         lines,
@@ -31,7 +38,12 @@ pub(super) async fn load_osm_cities(lat: f64, lon: f64) -> Result<Patch, crate::
 }
 fn parse_overpass(v: &serde_json::Value) -> Vec<Line> {
     let mut out = Vec::new();
-    for object in v["elements"].as_array().into_iter().flatten().take(3000) {
+    for object in v["elements"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .take(MAX_ELEMENTS)
+    {
         let kind = object["type"].as_str().unwrap_or("");
         if kind == "way" {
             push_geom(&object["geometry"], &mut out);
@@ -50,7 +62,7 @@ fn parse_overpass(v: &serde_json::Value) -> Vec<Line> {
     out
 }
 fn push_geom(v: &serde_json::Value, out: &mut Vec<Line>) {
-    if out.len() > 6000 {
+    if out.len() > LINE_ADMISSION_THRESHOLD {
         return;
     }
     let pts: Vec<(f64, f64)> = v

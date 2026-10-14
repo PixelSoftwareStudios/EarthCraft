@@ -41,8 +41,9 @@ cargo run -p earthcraft
 Keep `Cargo.lock` in version control. Normal verification uses `--locked` to
 catch unintended dependency resolution changes. Intentional dependency updates
 should be reviewed separately, including compatibility with Rust 1.95.
-The `app-build-test` workflow runs on pushes and pull requests changing `apps/**`
-or `crates/**`, and can also be run manually from Actions. It formats, lints,
+The `app-build-test` workflow runs on pushes and pull requests changing `apps/**`,
+`crates/**`, manifests/lockfiles or the workflow itself, and can also be run
+manually from Actions. It formats, lints,
 tests, and builds on Ubuntu using stable Rust. Use the latest supported major version tags for GitHub
 Actions, rather than commit hashes. For actions without version tags, follow the
 maintained upstream branch. Keep Rust toolchain versions explicit.
@@ -452,3 +453,20 @@ point and verify that only that point moves, including after releasing outside
 the map. Drag empty map space and verify normal navigation. Hover a point and
 press Delete or Backspace to remove only that point; focused text fields must
 keep their normal editing behavior. Check both UI languages and Clear all.
+
+## Live-layer refactor smoke checks
+
+Use isolated settings/cache. Toggle roads, AIS, satellites and traffic separately
+and together; drag/zoom/rotate while data completes, switch Earth models and
+resize/change DPI or text scale. Geometry must follow the displayed frame;
+labels retain their order, and hidden road fragments must not connect across
+space. Hover earlier as well as later fragments of a road. Clear/change the
+TomTom key during a pending request: old imagery must not return. Keep network
+failures visible and check both languages. Select System, metric and imperial
+units: the roads zoom hint must follow the resolved preference (180 km / 112 mi).
+
+Open the flat-Earth Easter egg and exercise all existing shortcuts and controls.
+Its scientific Earth-model dropdown must remain unchanged. Verify the illustration
+still matches its original layout, rotation, UV seam and rim; resize and change
+DPI, exit while its image loads, then reopen. Stationary repaints should reuse
+cached meshes. Automated headless tests do not replace these native checks.

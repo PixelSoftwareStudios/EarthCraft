@@ -44,6 +44,7 @@ fn gpu_overview_matches_cpu() {
                     },
                     overlays: None,
                     aircraft: None,
+                    live_layers: None,
                     presentation: 0,
                 };
                 for (loaded, pending) in [(false, false), (false, true), (true, false)] {
@@ -151,6 +152,7 @@ fn unsupported_views_choose_precision_instead_of_truncating_gpu_work() {
         },
         overlays: None,
         aircraft: None,
+        live_layers: None,
         presentation: 0,
     };
     assert!(GpuRenderer::supports(&request));

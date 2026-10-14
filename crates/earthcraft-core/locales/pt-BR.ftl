@@ -111,6 +111,7 @@ layers-municipal-borders-toggle = Limites de municípios do mundo (OSM) e Brasil
 layers-metro-borders-toggle = Regiões metropolitanas (disponível apenas para o Brasil)
 
 boundaries-loading-status = ⏳ Carregando limites e nomes…
+boundaries-osm-loading-status = ⏳ Carregando limites municipais próximos do OSM…
 
 layers-atmosphere-toggle = Atmosfera e estrelas
 
@@ -421,3 +422,33 @@ layers-satellites-toggle = Satélites (órbitas CelesTrak, estimadas)
 layers-traffic-toggle = Congestionamento real (TomTom; chave opcional)
 layers-traffic-key = Chave de API TomTom (não é salva)
 layers-roads-toggle = Estradas do mundo (OSM, sem chave)
+
+roads-zoom-help = Aproxime para exibir estradas (até { $altitude } de altitude)
+roads-loading-status = Carregando vias próximas…
+roads-loaded-status = { $count } trechos OSM • cinza = trânsito desconhecido; vermelho = acesso restrito/obra (não é engarrafamento)
+
+vessels-loading-status = Carregando navios AIS mundiais…
+vessels-world-status = { $count } navios • OpenSeaFeed mundial • cobertura parcial, observações até 90 min
+vessels-custom-status = { $count } navios • GeoJSON AIS configurado • cobertura do fornecedor
+vessels-fallback-status = { $count } navios • contingência Fintraffic (só Finlândia); fonte mundial indisponível
+vessels-fallback-source = Fintraffic (contingência)
+satellites-loading-status = Carregando órbitas…
+satellites-loaded-status = { $count } satélites • posição orbital aproximada (não telemetria)
+traffic-key-help = Insira uma chave TomTom para tráfego real
+traffic-zoom-help = Aproxime o mapa para mostrar o trânsito
+traffic-loading-status = Carregando tráfego real…
+traffic-loaded-status = Tráfego atualizado há { $minutes } min (verde=livre, amarelo=lento, vermelho=congestionado)
+
+roads-restricted-help = Acesso restrito/obra registrado no OSM (não é congestionamento)
+roads-flow-unknown-help = Fluxo de veículos: desconhecido (sem dados ao vivo)
+roads-hover-tooltip =
+    { $name } • { $kind }
+    { $state }
+
+vessels-hover-tooltip =
+    { $name } • MMSI { $mmsi }
+    { $latitude }°, { $longitude }° • { $course } • { $speed } kt
+    Último sinal AIS há { $minutes } min • cobertura depende da fonte
+satellites-hover-tooltip =
+    { $name } (NORAD { $norad })
+    Posição orbital estimada • CelesTrak

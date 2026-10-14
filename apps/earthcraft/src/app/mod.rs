@@ -20,6 +20,7 @@ mod files;
 mod flat_earth;
 mod frame_timing;
 mod globe;
+mod live_geometry;
 mod live_layers;
 mod live_maps;
 mod menu;
@@ -85,6 +86,8 @@ pub(crate) struct App {
     live_maps: live_maps::LiveMaps,
     live_aircraft: earthcraft_data::aircraft::LiveAircraft,
     aircraft_overlay: live_layers::AircraftOverlay,
+    live_geometry: live_geometry::LiveOverlay,
+    world_shapes: live_layers::WorldShapes,
 
     renderer: rendering::Renderer,
     scale_bar_cache: earthcraft_render::scale_bar::ScaleBarCache,
@@ -234,6 +237,8 @@ impl App {
                 move || ctx.request_repaint()
             }),
             aircraft_overlay: live_layers::AircraftOverlay::new(cc.egui_ctx.clone()),
+            live_geometry: live_geometry::LiveOverlay::new(cc.egui_ctx.clone()),
+            world_shapes: live_layers::WorldShapes::default(),
             texture: None,
             image: None,
             last_state: 0,

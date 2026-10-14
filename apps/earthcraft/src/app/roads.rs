@@ -1,73 +1,64 @@
 //! Keyless worldwide OSM road geometry; restrictions are not congestion reports.
-use earthcraft_core::{
-    camera::{Basis, Cam},
-    math::ll_to_v3,
-};
 use eframe::egui::{self, Color32, FontId, Pos2, Rect, Stroke};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub(super) struct RoadOverlay {
     pub service: earthcraft_data::roads::LiveRoads,
+    projected: Option<Arc<Vec<earthcraft_render::live_layers::ProjectedRoad>>>,
+    shapes: Vec<egui::Shape>,
 }
 impl RoadOverlay {
     pub fn draw(
-        &self,
+        &mut self,
         painter: &egui::Painter,
-        basis: &Basis,
-        rect: Rect,
-        camera: &Cam,
-        pt: bool,
+        geometry: &earthcraft_render::live_layers::LiveGeometry,
+        lang: earthcraft_core::language::Lang,
         scale: f32,
     ) {
+        let rect = geometry.input.view.rect;
+        let Some(roads) = &geometry.input.roads else {
+            return;
+        };
         let hover = painter
             .ctx()
             .pointer_hover_pos()
             .filter(|p| rect.contains(*p));
-        let mut nearest: Option<(&earthcraft_data::roads::Road, Pos2)> = None;
-        let mut min_distance = 12.0 * scale;
-        for road in self.service.snapshot(camera.lat, camera.lon, camera.alt) {
-            let mut visible = Vec::with_capacity(road.points.len());
-            for &(rlat, rlon) in &road.points {
-                if let Some(pos) = basis.project(ll_to_v3(rlat, rlon), rect) {
-                    visible.push(pos);
-                } else {
-                    draw_segment(painter, &visible, road, scale);
-                    visible.clear();
-                }
-            }
-            draw_segment(painter, &visible, road, scale);
-            if let Some(mouse) = hover {
-                for segment in visible.windows(2) {
-                    let a = segment[0];
-                    let b = segment[1];
-                    let ab = b - a;
-                    let factor = if ab.length_sq() > 0.01 {
-                        ((mouse - a).dot(ab) / ab.length_sq()).clamp(0.0, 1.0)
-                    } else {
-                        0.0
-                    };
-                    let near = a + ab * factor;
-                    let distance = (near - mouse).length();
-                    if distance < min_distance {
-                        min_distance = distance;
-                        nearest = Some((road, near));
-                    }
-                }
-            }
+        if self
+            .projected
+            .as_ref()
+            .is_none_or(|old| !Arc::ptr_eq(old, &geometry.roads))
+        {
+            let shapes = geometry
+                .roads
+                .iter()
+                .flat_map(|projected| {
+                    projected.segments.iter().filter_map(|line| {
+                        segment_shape(line, &roads[projected.source_index], scale)
+                    })
+                })
+                .collect();
+            self.shapes = super::live_geometry::mesh_shapes(painter, shapes);
+            self.projected = Some(geometry.roads.clone());
         }
+        painter.extend(self.shapes.iter().cloned());
+        let nearest = hover
+            .and_then(|mouse| geometry.nearest_road(mouse, 12.0 * scale))
+            .map(|(index, point)| (&roads[index], point));
         if let Some((road, screen)) = nearest {
-            let state = if road.restricted {
-                if pt {
-                    "Acesso restrito/obra registrado no OSM (não é congestionamento)"
-                } else {
-                    "OSM access restriction/construction (not a traffic jam)"
-                }
-            } else if pt {
-                "Fluxo de veículos: desconhecido (sem dados ao vivo)"
+            let state = lang.text(if road.restricted {
+                "roads-restricted-help"
             } else {
-                "Vehicle flow: unknown (no live observations)"
-            };
-            let text = format!("{} • {}\n{}", road.name, road.kind, state);
+                "roads-flow-unknown-help"
+            });
+            let text = lang.format(
+                "roads-hover-tooltip",
+                &[
+                    ("name", road.name.as_str().into()),
+                    ("kind", road.kind.as_str().into()),
+                    ("state", state.into()),
+                ],
+            );
             let galley =
                 painter.layout_no_wrap(text, FontId::proportional(12.0 * scale), Color32::WHITE);
             let pos = Pos2::new(
@@ -87,14 +78,13 @@ impl RoadOverlay {
         }
     }
 }
-fn draw_segment(
-    painter: &egui::Painter,
+fn segment_shape(
     points: &[Pos2],
     road: &earthcraft_data::roads::Road,
     scale: f32,
-) {
+) -> Option<egui::Shape> {
     if points.len() < 2 {
-        return;
+        return None;
     }
     let major = matches!(
         road.kind.as_str(),
@@ -109,8 +99,8 @@ fn draw_segment(
     } else {
         Color32::from_rgba_unmultiplied(165, 174, 191, 165)
     };
-    painter.add(egui::Shape::line(
+    Some(egui::Shape::line(
         points.to_vec(),
         Stroke::new(width * scale, color),
-    ));
+    ))
 }

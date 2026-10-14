@@ -111,6 +111,7 @@ layers-municipal-borders-toggle = Municipal borders worldwide (OSM), Brazil (IBG
 layers-metro-borders-toggle = Metropolitan regions (Brazil only)
 
 boundaries-loading-status = ⏳ Loading borders and names…
+boundaries-osm-loading-status = ⏳ Loading nearby municipal borders from OSM…
 
 layers-atmosphere-toggle = Atmosphere and stars
 
@@ -421,3 +422,33 @@ layers-satellites-toggle = Satellites (predicted CelesTrak orbits)
 layers-traffic-toggle = Live congestion (TomTom; optional key)
 layers-traffic-key = TomTom API key (not stored)
 layers-roads-toggle = Worldwide roads (OSM, no key)
+
+roads-zoom-help = Zoom in for roads (below { $altitude } altitude)
+roads-loading-status = Loading nearby roads…
+roads-loaded-status = { $count } OSM road segments • gray = traffic unknown; red = restricted/under construction (NOT a traffic jam)
+
+vessels-loading-status = Loading worldwide AIS ships…
+vessels-world-status = { $count } vessels • worldwide OpenSeaFeed • partial reception, reports up to 90 min old
+vessels-custom-status = { $count } vessels • custom AIS GeoJSON • provider coverage
+vessels-fallback-status = { $count } vessels • Fintraffic fallback (Finland only); global feed unavailable
+vessels-fallback-source = Fintraffic (fallback)
+satellites-loading-status = Loading orbits…
+satellites-loaded-status = { $count } satellites • approximate orbital position (not telemetry)
+traffic-key-help = Enter a TomTom key for real traffic
+traffic-zoom-help = Zoom in to see traffic
+traffic-loading-status = Loading live traffic…
+traffic-loaded-status = Traffic updated { $minutes } min ago (green=free, yellow=slow, red=jammed)
+
+roads-restricted-help = OSM access restriction/construction (not a traffic jam)
+roads-flow-unknown-help = Vehicle flow: unknown (no live observations)
+roads-hover-tooltip =
+    { $name } • { $kind }
+    { $state }
+
+vessels-hover-tooltip =
+    { $name } • MMSI { $mmsi }
+    { $latitude }°, { $longitude }° • { $course } • { $speed } kt
+    Last AIS report { $minutes } min ago • coverage varies
+satellites-hover-tooltip =
+    { $name } (NORAD { $norad })
+    Estimated orbital position • CelesTrak

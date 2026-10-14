@@ -69,6 +69,7 @@ fn request(longitude: f64, presentation: u64) -> RenderRequest {
         presentation,
         overlays: None,
         aircraft: None,
+        live_layers: None,
     }
 }
 

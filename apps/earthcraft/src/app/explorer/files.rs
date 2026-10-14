@@ -32,6 +32,7 @@ impl Explorer {
         let (path, encoded) = match target {
             ImageTarget::Planet => (&self.image_path, &self.image_bytes),
             ImageTarget::Sky => (&self.sky_path, &self.sky_bytes),
+            ImageTarget::FlatEarth => unreachable!("illustration requests are owned by the app"),
             ImageTarget::Moon => {
                 self.choose(Body::Moon, jobs);
                 return;
@@ -85,6 +86,9 @@ impl Explorer {
             ImageTarget::Planet => "custom-planet",
             ImageTarget::Sky => "custom-sky",
             ImageTarget::Moon => "Moon",
+            ImageTarget::FlatEarth => {
+                unreachable!("illustration results are dispatched by the app")
+            }
         };
         let texture = upload_image(ctx, label, image.pixels);
         match target {
@@ -97,6 +101,9 @@ impl Explorer {
                 self.sky = Some(texture);
                 self.sky_bytes = Some(image.encoded);
                 self.message = lang.text("explorer-sky-applied").into();
+            }
+            ImageTarget::FlatEarth => {
+                unreachable!("illustration results are dispatched by the app")
             }
             ImageTarget::Moon => {
                 self.moon = Some(texture);

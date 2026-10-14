@@ -81,6 +81,12 @@ impl App {
                     }
                     self.settings_writer.kml_paths(&self.kml_session.paths);
                 }
+                Ok(FileOutcome::ImageLoaded {
+                    target: earthcraft_data::files::ImageTarget::FlatEarth,
+                    image,
+                }) => {
+                    self.flat_earth.image_loaded(ctx, image);
+                }
                 Ok(FileOutcome::ImageLoaded { target, image }) => {
                     self.explorer.image_loaded(target, image, ctx, self.lang);
                 }
@@ -143,6 +149,11 @@ impl App {
                         FileKind::OpenKml | FileKind::RestoreKml => "kml-open-error",
                         FileKind::SaveKml => "kml-save-error",
                         FileKind::Screenshot => "screenshot-save-error",
+                        FileKind::Image(earthcraft_data::files::ImageTarget::FlatEarth) => {
+                            self.flat_earth.image_failed = true;
+                            self.status = format!("Flat Earth artwork failed: {error}");
+                            continue;
+                        }
                         FileKind::Image(_) | FileKind::OpenPlanet | FileKind::SavePlanet => {
                             self.explorer.file_failed(kind, error);
                             continue;

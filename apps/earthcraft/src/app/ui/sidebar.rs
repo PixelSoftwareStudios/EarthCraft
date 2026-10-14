@@ -120,8 +120,11 @@ impl App {
                                 &mut self.show_metro_boundaries,
                                 lg.text("layers-metro-borders-toggle"),
                             );
-                            if self.boundary_loader.is_loading() {
+                            if self.boundary_loader.is_loading_base_layers() {
                                 ui.weak(lg.text("boundaries-loading-status"));
+                            }
+                            if self.boundary_loader.is_loading_world_cities() {
+                                ui.weak(lg.text("boundaries-osm-loading-status"));
                             }
                             if let Ok(log) = self.boundary_log.lock() {
                                 for line in log.iter() {
@@ -136,13 +139,10 @@ impl App {
                             );
                             ui.checkbox(&mut self.show_vessels, lg.text("layers-vessels-toggle"));
                             if self.show_vessels {
-                                ui.small(
-                                    self.live_vessels
-                                        .status(lg == earthcraft_core::language::Lang::PtBr),
-                                );
+                                ui.small(self.live_vessels.status(lg));
                                 ui.hyperlink_to("OpenSeaFeed AIS", "https://openseafeed.com/");
                                 ui.hyperlink_to(
-                                    "Fintraffic (contingência)",
+                                    lg.text("vessels-fallback-source"),
                                     "https://www.digitraffic.fi/en/marine-traffic/",
                                 );
                             }
@@ -151,17 +151,15 @@ impl App {
                                 lg.text("layers-satellites-toggle"),
                             );
                             if self.show_satellites {
-                                ui.small(
-                                    self.live_satellites
-                                        .status(lg == earthcraft_core::language::Lang::PtBr),
-                                );
+                                ui.small(self.live_satellites.status(lg));
                                 ui.hyperlink_to("CelesTrak", "https://celestrak.org/");
                             }
                             ui.checkbox(&mut self.show_roads, lg.text("layers-roads-toggle"));
                             if self.show_roads {
                                 ui.small(self.roads.service.status(
                                     self.cam.alt,
-                                    lg == earthcraft_core::language::Lang::PtBr,
+                                    lg,
+                                    self.distance_units(),
                                 ));
                                 ui.hyperlink_to(
                                     "© OpenStreetMap contributors (ODbL)",
@@ -178,7 +176,7 @@ impl App {
                                 ui.small(self.traffic.service.status(
                                     &self.tomtom_key,
                                     self.cam.alt,
-                                    lg == earthcraft_core::language::Lang::PtBr,
+                                    lg,
                                 ));
                                 ui.hyperlink_to("TomTom Traffic", "https://developer.tomtom.com/");
                             }

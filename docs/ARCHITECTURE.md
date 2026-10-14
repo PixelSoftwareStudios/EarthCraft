@@ -62,6 +62,42 @@ RGBA buffers are reused when uniquely owned; screenshots retain immutable `Arc`
 snapshots, so an export never reads a recycled frame. PNG encoding runs on the
 bounded file worker.
 
+## Live layers and the hidden illustration
+
+Roads, AIS vessels, predicted satellite subpoints and traffic rasters use a
+render-owned preparer and coalesced worker: one active request, one replaceable
+pending request and one completed result. Inputs hold immutable `Arc` snapshots.
+Moving raster frames carry geometry prepared for their camera; stationary data
+refreshes use the same preparer off the UI thread. The app rejects geometry with
+an incompatible camera, rectangle, DPI, scale, data identity or orbital time tick.
+Roads/vessels/traffic reuse their prepared components when only satellite time
+changes. Screen projection uses the selected Earth's surface; road hover tests
+all visible fragments after a cheap prepared-bounds rejection.
+
+Egui owns final styled mesh/label caches and texture upload. Traffic image
+projection and tile decode/stitching stay off egui; the data-owned feature and
+tile workers also perform OSM geometry conversion, AIS conversion and OMM
+conversion. Snapshots are allocated before publication, so applying a result
+swaps shared ownership instead of cloning fleets or road arrays. Service URLs,
+refresh intervals, retries, source fallback and draw order remain unchanged.
+Traffic completions from a replaced or cleared API key are discarded.
+Nearby OSM municipal requests never overlap; their loading status is separate
+from the initial border/name datasets.
+
+`earthcraft-core::orbit` owns the existing approximate two-body propagation;
+data owns CelesTrak format/epoch decoding. This preserves the existing educational
+model, not SGP4 precision, and rejects invalid/non-finite orbital elements.
+Normal live-layer labels use Fluent; errors retain structured causes until status
+formatting. Roads' zoom limit uses the selected distance units (180 km / 112 mi).
+
+The flat-Earth illustration remains a separate hidden scene with its existing
+shortcuts, pan/rotate/zoom/reset/exit controls. It never changes `EarthModel`.
+Its embedded image loads on the file worker. The app shares a static disk
+layout (3,201 vertices / 6,144 triangles), caches tessellated stars/rim/surface
+meshes per viewport/rotation/zoom/texture/DPI, and rebuilds only when that view
+changes. Image completion after exit cannot reopen it. See the isolated
+construction comparison in `PERFORMANCE_BASELINE.md`.
+
 ## Overlays and spatial indexes
 
 Render owns geographic visibility, border projection and ordered label candidates.

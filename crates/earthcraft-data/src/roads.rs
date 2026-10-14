@@ -1,7 +1,7 @@
 //! Road geometry and static access restrictions from OpenStreetMap/Overpass.
 //! No account/API key. OSM is NOT a source of live vehicle speeds or jams.
 use std::{
-    sync::mpsc,
+    sync::{Arc, mpsc},
     time::{Duration, Instant},
 };
 const MAX_ALTITUDE_KM: f64 = 180.0;
@@ -18,19 +18,19 @@ pub struct Road {
     pub points: Vec<(f64, f64)>,
 }
 struct RoadSnapshot {
-    roads: Vec<Road>,
+    roads: Arc<[Road]>,
     latitude: f64,
     longitude: f64,
 }
 
 #[derive(Default)]
 pub struct LiveRoads {
-    current: Vec<Road>,
+    current: Arc<[Road]>,
     loaded: Option<Instant>,
     attempt: Option<Instant>,
     requested: Option<(f64, f64)>,
     rx: Option<mpsc::Receiver<Result<RoadSnapshot, crate::Error>>>,
-    error: Option<String>,
+    error: Option<crate::Error>,
 }
 impl LiveRoads {
     pub fn snapshot(&self, lat: f64, lon: f64, alt: f64) -> &[Road] {
@@ -44,37 +44,31 @@ impl LiveRoads {
         }
         &self.current
     }
-    pub fn status(&self, alt: f64, pt: bool) -> String {
+    pub fn shared_snapshot(&self, lat: f64, lon: f64, alt: f64) -> Option<Arc<[Road]>> {
+        (!self.snapshot(lat, lon, alt).is_empty()).then(|| self.current.clone())
+    }
+    pub fn status(
+        &self,
+        alt: f64,
+        lang: earthcraft_core::language::Lang,
+        units: earthcraft_core::units::DistanceUnits,
+    ) -> String {
         if alt > MAX_ALTITUDE_KM {
-            return if pt {
-                "Aproxime para exibir estradas (até 180 km de altitude)"
-            } else {
-                "Zoom in for roads (below 180 km altitude)"
-            }
-            .into();
+            return lang.format(
+                "roads-zoom-help",
+                &[("altitude", units.altitude(MAX_ALTITUDE_KM).into())],
+            );
         }
-        if let Some(e) = &self.error {
-            return format!("OpenStreetMap/Overpass: {e}");
+        if let Some(error) = &self.error {
+            return format!("OpenStreetMap/Overpass: {error}");
         }
         if self.loaded.is_none() {
-            return if pt {
-                "Carregando vias próximas…"
-            } else {
-                "Loading nearby roads…"
-            }
-            .into();
+            return lang.text("roads-loading-status").into();
         }
-        if pt {
-            format!(
-                "{} trechos OSM • cinza = trânsito desconhecido; vermelho = acesso restrito/obra (não é engarrafamento)",
-                self.current.len()
-            )
-        } else {
-            format!(
-                "{} OSM road segments • gray = traffic unknown; red = restricted/under construction (NOT a traffic jam)",
-                self.current.len()
-            )
-        }
+        lang.format(
+            "roads-loaded-status",
+            &[("count", self.current.len().into())],
+        )
     }
     pub fn update(
         &mut self,
@@ -95,7 +89,7 @@ impl LiveRoads {
                     self.rx = None;
                 }
                 Ok(Err(e)) => {
-                    self.error = Some(e.to_string());
+                    self.error = Some(e);
                     self.rx = None;
                 }
                 Err(mpsc::TryRecvError::Disconnected) => {
@@ -144,7 +138,7 @@ fn nearby(lat: f64, lon: f64, a: f64, b: f64, radius: f64) -> bool {
     let dlon = (lon - b + 180.0).rem_euclid(360.0) - 180.0;
     (lat - a).abs() <= radius && dlon.abs() * lat.to_radians().cos().abs().max(0.1) <= radius
 }
-async fn download(lat: f64, lon: f64, alt: f64) -> Result<Vec<Road>, crate::Error> {
+async fn download(lat: f64, lon: f64, alt: f64) -> Result<Arc<[Road]>, crate::Error> {
     let delta = coverage_radius(alt);
     let lat0 = (lat - delta).max(-85.0);
     let lat1 = (lat + delta).min(85.0);
@@ -172,7 +166,12 @@ async fn download(lat: f64, lon: f64, alt: f64) -> Result<Vec<Road>, crate::Erro
         .await
         {
             Ok(bytes) => match crate::http::parse_json(bytes).await {
-                Ok(json) if json["elements"].is_array() => return Ok(parse_overpass(&json)),
+                Ok(json) if json["elements"].is_array() => {
+                    return crate::cpu::run(crate::cpu::Service::Features, move || {
+                        Ok(parse_overpass(&json).into())
+                    })
+                    .await;
+                }
                 Ok(_) => last = Some("Unexpected Overpass response".into()),
                 Err(e) => last = Some(e),
             },
@@ -244,5 +243,54 @@ mod tests {
     #[test]
     fn antimeridian_distance_uses_wrapped_longitude() {
         assert!(nearby(0.0, 179.99, 0.0, -179.99, 0.04));
+    }
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::*;
+    use earthcraft_core::{language::Lang, units::DistanceUnits};
+    #[test]
+    fn zoom_hint_follows_metric_and_imperial_units_in_both_languages() {
+        let roads = LiveRoads::default();
+        for lang in Lang::ALL {
+            let metric = roads.status(MAX_ALTITUDE_KM + 1.0, lang, DistanceUnits::Metric);
+            let imperial = roads.status(MAX_ALTITUDE_KM + 1.0, lang, DistanceUnits::Imperial);
+            assert!(metric.contains("180 km"), "{metric}");
+            assert!(imperial.contains("112 mi"), "{imperial}");
+            assert!(!imperial.contains("km"));
+            assert_eq!(
+                roads.status(MAX_ALTITUDE_KM, lang, DistanceUnits::Imperial),
+                lang.text("roads-loading-status")
+            );
+        }
+    }
+    #[test]
+    fn immutable_snapshots_are_shared_and_outlive_refresh_without_expanding_coverage() {
+        let road = Road {
+            name: "Old".into(),
+            kind: "primary".into(),
+            restricted: false,
+            points: vec![(0.0, 0.0), (0.1, 0.1)],
+        };
+        let mut roads = LiveRoads {
+            current: vec![road].into(),
+            loaded: Some(Instant::now()),
+            requested: Some((0.0, 0.0)),
+            ..Default::default()
+        };
+        let old = roads.shared_snapshot(0.0, 0.0, 1.0).unwrap();
+        assert!(Arc::ptr_eq(
+            &old,
+            &roads.shared_snapshot(0.0, 0.0, 1.0).unwrap()
+        ));
+        roads.current = Arc::from([]);
+        assert_eq!(old[0].name, "Old");
+        assert!(roads.shared_snapshot(0.0, 0.0, 1.0).is_none());
+        assert!(
+            roads
+                .shared_snapshot(0.0, 0.0, MAX_ALTITUDE_KM + 1.0)
+                .is_none()
+        );
     }
 }

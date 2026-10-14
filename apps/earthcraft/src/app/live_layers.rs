@@ -1,5 +1,7 @@
 //! Aircraft geometry is prepared in render; styled shapes and hover stay in egui.
 mod shapes;
+mod world;
+pub(super) use world::WorldShapes;
 #[cfg(test)]
 mod tests;
 use super::App;
@@ -7,7 +9,7 @@ use earthcraft_core::{camera::Basis, language::Lang, math::now_unix};
 use earthcraft_render::aircraft::{
     AircraftGeometry, AircraftWorker, ProjectionInput, ProjectionView,
 };
-use eframe::egui::{self, Align2, Color32, FontId, Rect, Stroke, Vec2};
+use eframe::egui::{self, Color32, FontId, Rect, Vec2};
 use std::{sync::Arc, time::Duration};
 
 pub(super) const FLIGHT_REPAINT_INTERVAL: Duration = Duration::from_secs(1);
@@ -110,6 +112,7 @@ impl App {
         basis: &Basis,
         rect: Rect,
         altitude_km: f64,
+        geometry: Option<&earthcraft_render::live_layers::LiveGeometry>,
     ) {
         if self.show_flights {
             let input =
@@ -117,11 +120,15 @@ impl App {
             self.aircraft_overlay.draw(painter, input, self.lang);
             painter.ctx().request_repaint_after(FLIGHT_REPAINT_INTERVAL);
         }
-        if self.show_vessels {
-            self.draw_vessel_overlay(painter, basis, rect, altitude_km);
+        if self.show_vessels
+            && let Some(geometry) = geometry
+        {
+            self.draw_vessel_overlay(painter, geometry);
         }
-        if self.show_satellites {
-            self.draw_satellite_overlay(painter, basis, rect, altitude_km);
+        if self.show_satellites
+            && let Some(geometry) = geometry
+        {
+            self.draw_satellite_overlay(painter, geometry);
             // Orbit predictions need to move even without another network fetch.
             painter.ctx().request_repaint_after(Duration::from_secs(1));
         }
@@ -208,65 +215,28 @@ fn draw_hover(painter: &egui::Painter, geometry: &AircraftGeometry, lang: Lang) 
 // Additional worldwide AIS and predicted orbital-position layers.
 impl App {
     fn draw_vessel_overlay(
-        &self,
+        &mut self,
         painter: &egui::Painter,
-        basis: &Basis,
-        rect: Rect,
-        altitude: f64,
+        geometry: &earthcraft_render::live_layers::LiveGeometry,
     ) {
-        use earthcraft_core::math::ll_to_v3;
+        let rect = geometry.input.view.rect;
+        let Some(vessels) = &geometry.input.vessels else {
+            return;
+        };
         let ms = self.settings.map_scale;
         let hover = painter.ctx().pointer_hover_pos();
         let mut nearest: Option<(&earthcraft_data::vessels::Vessel, egui::Pos2)> = None;
         let mut distance = (14.0 * ms).powi(2);
-        let mut labels = 0;
-        for ship in self.live_vessels.snapshot() {
-            let Some(at) = basis.project(ll_to_v3(ship.lat, ship.lon), rect) else {
-                continue;
-            };
-            if !rect.contains(at) {
-                continue;
-            }
-            let (lat_ahead, lon_ahead) =
-                earthcraft_core::math::destination(ship.lat, ship.lon, ship.course, 2.0);
-            let forward = basis
-                .project(ll_to_v3(lat_ahead, lon_ahead), rect)
-                .map(|p| p - at)
-                .filter(|v| v.length_sq() > 0.0001)
-                .map(|v| v.normalized() * 8.0 * ms)
-                .unwrap_or(Vec2::new(0.0, -8.0 * ms));
-            let right = Vec2::new(-forward.y, forward.x) * 0.55;
-            painter.add(egui::Shape::convex_polygon(
-                vec![
-                    at + forward,
-                    at + right - forward * 0.8,
-                    at - forward * 0.65,
-                    at - right - forward * 0.8,
-                ],
-                Color32::from_rgb(52, 224, 229),
-                Stroke::new(1.0 * ms, Color32::from_rgb(5, 60, 65)),
-            ));
+        painter.extend(self.world_shapes.vessels(painter, geometry).iter().cloned());
+        for projected in geometry.vessels.iter() {
+            let ship = &vessels[projected.source_index];
+            let at = projected.position;
             if let Some(h) = hover {
                 let d = (h - at).length_sq();
                 if d < distance {
                     distance = d;
                     nearest = Some((ship, at));
                 }
-            }
-            if altitude < 75.0 && labels < 75 {
-                let text = if ship.name.is_empty() {
-                    &ship.mmsi
-                } else {
-                    &ship.name
-                };
-                painter.text(
-                    at + Vec2::new(8.0 * ms, 0.0),
-                    Align2::LEFT_CENTER,
-                    text,
-                    FontId::proportional(10.0 * ms),
-                    Color32::from_rgb(120, 245, 245),
-                );
-                labels += 1;
             }
         }
         if let Some((ship, at)) = nearest {
@@ -276,59 +246,51 @@ impl App {
                 &ship.name
             };
             let age_minutes = ((now_unix() - ship.observed_unix).max(0.0) / 60.0).round();
-            let observed = if self.lang == earthcraft_core::language::Lang::PtBr {
-                format!("Último sinal AIS há {age_minutes:.0} min • cobertura depende da fonte")
-            } else {
-                format!("Last AIS report {age_minutes:.0} min ago • coverage varies")
-            };
-            let text = format!(
-                "{} • MMSI {}\n{:.3}°, {:.3}° • {:.0}° • {} kt\n{}",
-                name,
-                ship.mmsi,
-                ship.lat,
-                ship.lon,
-                ship.course,
-                ship.speed_knots.map_or("?".into(), |s| format!("{s:.1}")),
-                observed
+            let text = self.lang.format(
+                "vessels-hover-tooltip",
+                &[
+                    ("name", name.into()),
+                    ("mmsi", ship.mmsi.as_str().into()),
+                    ("latitude", format!("{:.3}", ship.lat).into()),
+                    ("longitude", format!("{:.3}", ship.lon).into()),
+                    (
+                        "course",
+                        earthcraft_core::compass::heading_text(ship.course, self.lang).into(),
+                    ),
+                    (
+                        "speed",
+                        ship.speed_knots
+                            .map_or("?".into(), |speed| format!("{speed:.1}"))
+                            .into(),
+                    ),
+                    ("minutes", format!("{age_minutes:.0}").into()),
+                ],
             );
             hover_label(painter, rect, at, &text, ms);
         }
     }
     fn draw_satellite_overlay(
-        &self,
+        &mut self,
         painter: &egui::Painter,
-        basis: &Basis,
-        rect: Rect,
-        altitude: f64,
+        geometry: &earthcraft_render::live_layers::LiveGeometry,
     ) {
-        use earthcraft_core::math::{ll_to_v3, now_unix};
+        let rect = geometry.input.view.rect;
+        let Some(satellites) = &geometry.input.satellites else {
+            return;
+        };
         let ms = self.settings.map_scale;
-        let now = now_unix();
         let hover = painter.ctx().pointer_hover_pos();
         let mut nearest: Option<(&earthcraft_data::satellites::Satellite, egui::Pos2)> = None;
         let mut distance = (13.0 * ms).powi(2);
-        let mut labels = 0;
-        for sat in self.live_satellites.snapshot() {
-            let Some((lat, lon)) = sat.ground_position(now) else {
-                continue;
-            };
-            let Some(at) = basis.project(ll_to_v3(lat, lon), rect) else {
-                continue;
-            };
-            if !rect.contains(at) {
-                continue;
-            }
-            let s = 5.0 * ms;
-            painter.add(egui::Shape::convex_polygon(
-                vec![
-                    at + Vec2::new(0.0, -s),
-                    at + Vec2::new(s, 0.0),
-                    at + Vec2::new(0.0, s),
-                    at + Vec2::new(-s, 0.0),
-                ],
-                Color32::from_rgb(207, 159, 255),
-                Stroke::new(ms, Color32::from_rgb(62, 22, 91)),
-            ));
+        painter.extend(
+            self.world_shapes
+                .satellites(painter, geometry)
+                .iter()
+                .cloned(),
+        );
+        for projected in geometry.satellites.iter() {
+            let sat = &satellites[projected.source_index];
+            let at = projected.position;
             if let Some(h) = hover {
                 let d = (h - at).length_sq();
                 if d < distance {
@@ -336,30 +298,15 @@ impl App {
                     nearest = Some((sat, at));
                 }
             }
-            if altitude < 900.0 && labels < 60 {
-                painter.text(
-                    at + Vec2::new(8.0 * ms, 0.0),
-                    Align2::LEFT_CENTER,
-                    &sat.name,
-                    FontId::proportional(10.0 * ms),
-                    Color32::from_rgb(219, 178, 252),
-                );
-                labels += 1;
-            }
         }
         if let Some((sat, at)) = nearest {
-            let pt = self.lang == earthcraft_core::language::Lang::PtBr;
-            let text = if pt {
-                format!(
-                    "{} (NORAD {})\nPosição orbital estimada • CelesTrak",
-                    sat.name, sat.norad
-                )
-            } else {
-                format!(
-                    "{} (NORAD {})\nEstimated orbital position • CelesTrak",
-                    sat.name, sat.norad
-                )
-            };
+            let text = self.lang.format(
+                "satellites-hover-tooltip",
+                &[
+                    ("name", sat.name.as_str().into()),
+                    ("norad", sat.norad.as_str().into()),
+                ],
+            );
             hover_label(painter, rect, at, &text, ms);
         }
     }
