@@ -40,6 +40,10 @@ six native architecture builds and upload preview artifacts without publishing
 a release.
 After merge, the Actions page also offers a manual **Release** run with the same
 preview-only behavior. Inspect and test these artifacts before creating a version tag.
+Actions artifact names also include the workspace version, so their downloadable
+wrapper ZIPs are versioned (for example,
+`earthcraft-0.1.0-x86_64-pc-windows-msvc.zip`). The release package inside retains
+its friendly platform name from the table above.
 
 ## Publish a version
 
