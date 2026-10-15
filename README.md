@@ -60,6 +60,10 @@ Drag: rotate globe · Right-click: location context menu · Right-drag / Shift+d
 Click **Camera altitude** in the bottom bar to enter an exact altitude.
 
 Use **☰** in the toolbar to hide or reopen the sidebar and give the map more room.
+The ruler button enables measuring and brings the Ruler controls into view; the
+camera button saves a PNG to the screenshot folder in Settings without a dialog.
+Choose **Settings → Language** to follow the system locale (the default), use
+English or use Português (Brasil). Unsupported system languages fall back to English.
 
 On macOS, the native **File** menu opens/saves KML and saves PNG screenshots. Use Cmd+O to open, Cmd+S to save, Cmd+Shift+S for Save As, and Cmd+Shift+E for a screenshot. Screenshots use the folder selected in Settings. Quit is in the application menu. Windows and Linux use the sidebar's file controls and the same shortcuts with Ctrl instead of Cmd; Ctrl+Q quits.
 

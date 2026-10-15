@@ -13,6 +13,7 @@ mod selection;
 mod settings;
 mod sidebar;
 mod suggestions;
+mod toolbar;
 mod updater;
 pub(in crate::app) fn apply_ui_scale(ctx: &egui::Context, scale: f32) {
     use egui::{

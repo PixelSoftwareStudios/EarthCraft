@@ -1,6 +1,6 @@
 //! One filesystem worker, with coalesced settings and language writes.
 use super::Settings;
-use earthcraft_core::language::Lang;
+use earthcraft_core::language::LanguagePreference;
 use std::{
     path::PathBuf,
     sync::{Arc, Condvar, Mutex},
@@ -9,7 +9,7 @@ use std::{
 #[derive(Default)]
 struct Pending {
     settings: Option<Settings>,
-    lang: Option<Lang>,
+    lang: Option<LanguagePreference>,
     kml_paths: Option<Vec<PathBuf>>,
     stopped: bool,
     error: Option<String>,
@@ -96,7 +96,7 @@ impl SettingsWriter {
         self.shared.pending.lock().unwrap().kml_paths = Some(paths.to_vec());
         self.shared.wake.notify_one();
     }
-    pub fn language(&self, lang: Lang) {
+    pub fn language(&self, lang: LanguagePreference) {
         self.shared.pending.lock().unwrap().lang = Some(lang);
         self.shared.wake.notify_one();
     }
@@ -130,6 +130,43 @@ impl Drop for SettingsWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use earthcraft_core::language::Lang;
+    #[test]
+    fn language_preferences_preserve_legacy_overrides_and_roundtrip_system_choice() {
+        let root = std::env::temp_dir().join(format!("earthcraft-language-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("lang.txt");
+        assert_eq!(
+            super::super::load_language_preference_at(&path),
+            LanguagePreference::System
+        );
+        for (legacy, expected) in [("en\n", Lang::En), (" pt-BR ", Lang::PtBr)] {
+            std::fs::write(&path, legacy).unwrap();
+            let preference = super::super::load_language_preference_at(&path);
+            assert_eq!(preference, LanguagePreference::Explicit(expected));
+            assert_eq!(preference.resolve("en-US"), expected);
+            assert_eq!(preference.resolve("pt-BR"), expected);
+        }
+        for preference in LanguagePreference::ALL {
+            let mut writer = SettingsWriter::at(root.clone(), || {}).unwrap();
+            writer.language(preference);
+            writer.finish().unwrap();
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), preference.code());
+            assert_eq!(super::super::load_language_preference_at(&path), preference);
+        }
+        let mut writer = SettingsWriter::at(root.clone(), || {}).unwrap();
+        writer.language(LanguagePreference::System);
+        writer.finish().unwrap();
+        let preference = super::super::load_language_preference_at(&path);
+        assert_eq!(preference.resolve("pt-BR"), Lang::PtBr);
+        assert_eq!(preference.resolve("en-US"), Lang::En);
+        std::fs::write(&path, "unsupported").unwrap();
+        assert_eq!(
+            super::super::load_language_preference_at(&path),
+            LanguagePreference::System
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn explicit_shutdown_reports_final_write_failures() {
         let root = std::env::temp_dir().join(format!(
@@ -162,7 +199,11 @@ mod tests {
                 kml_dir: value.to_string(),
                 ..Settings::default()
             });
-            writer.language(if value % 2 == 0 { Lang::En } else { Lang::PtBr });
+            writer.language(LanguagePreference::Explicit(if value % 2 == 0 {
+                Lang::En
+            } else {
+                Lang::PtBr
+            }));
             writer.kml_paths(&[fixture.0.join(format!("{value}.kml"))]);
         }
         drop(writer);

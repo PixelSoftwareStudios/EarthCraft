@@ -165,6 +165,14 @@ file dialogs, or packaging. Run the following manual checks for affected areas:
   KMZ selects the first KML entry and uses the upstream reader directly; plain
   KML keeps its existing XML repair and folder-visibility handling.
 - Create placemarks; save/open/drop KML; export a screenshot and use the ruler.
+  Collapse the Ruler section, scroll away, then hide the sidebar. Click the
+  toolbar ruler: the sidebar must reopen, expand Ruler and scroll its controls
+  into view. Toggle the sidebar checkbox and check the toolbar's selected state.
+  Click the ruler again with measurements and undo/redo history: retain both.
+  Click the camera repeatedly: save clean PNGs to the configured folder without
+  dialogs or overwrites, preserving pixels/resolution/attribution. Before the
+  first frame, the camera must be disabled. Use an unwritable folder and check
+  the existing English error status. Check native menus and keyboard shortcuts.
   Open several KML files, restart and verify their saved contents reopen in order.
   Remove one source externally, restart and verify it is silently pruned from
   `open-kml.json`; malformed/unreadable sources should report errors and remain
@@ -199,6 +207,10 @@ file dialogs, or packaging. Run the following manual checks for affected areas:
   a short option selected. The selected/hovered rectangle must fill every row,
   including empty space to the right, even on the first opening.
 - Switch English/Portuguese, change UI/map scales, then restart to verify persistence.
+  Use Settings → Language: new installs select System Locale; test Portuguese,
+  English and unsupported OS locales, explicit overrides and restart persistence.
+  Existing `lang.txt` values `en`/`pt-BR` must remain explicit; selecting System
+  Locale stores `system` and follows a changed OS locale on the next launch.
   Ruler help uses Option-click on macOS and Alt-click elsewhere.
 
 Report which checks actually ran and which platforms/services remain unverified.

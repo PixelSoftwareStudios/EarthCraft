@@ -300,99 +300,88 @@ impl App {
                             }
                         });
 
-                    egui::CollapsingHeader::new(lg.text("ruler-section-title"))
-                        .default_open(true)
-                        .show(ui, |ui| {
-                            ui.checkbox(&mut self.ruler, lg.text("ruler-enable-toggle"));
-                            let selected = super::ruler::unit_selector(
-                                ui,
-                                self.settings.ruler_unit,
-                                self.us_locale,
-                                lg,
-                            );
-                            if selected != self.settings.ruler_unit {
-                                self.settings.ruler_unit = selected;
-                            }
-                            if ui.button(lg.text("ruler-points-edit-action")).clicked() {
-                                self.ruler_paths.end_move();
-                                self.ruler_drag = None;
-                                self.ruler_point_editor = Some(super::ruler::PointEditor::new((
-                                    self.cam.lat,
-                                    self.cam.lon,
-                                )));
-                            }
-                            let model = self.active_earth_model();
-                            let total = self.ruler_paths.distance_km(model);
+                    super::ruler::section(ui, lg, self.ruler_reveal_requested, |ui| {
+                        ui.checkbox(&mut self.ruler, lg.text("ruler-enable-toggle"));
+                        let selected = super::ruler::unit_selector(
+                            ui,
+                            self.settings.ruler_unit,
+                            self.us_locale,
+                            lg,
+                        );
+                        if selected != self.settings.ruler_unit {
+                            self.settings.ruler_unit = selected;
+                        }
+                        if ui.button(lg.text("ruler-points-edit-action")).clicked() {
+                            self.ruler_paths.end_move();
+                            self.ruler_drag = None;
+                            self.ruler_point_editor =
+                                Some(super::ruler::PointEditor::new((self.cam.lat, self.cam.lon)));
+                        }
+                        let model = self.active_earth_model();
+                        let total = self.ruler_paths.distance_km(model);
+                        ui.label(
+                            lg.format(
+                                "ruler-measurement-summary",
+                                &[
+                                    ("count", self.ruler_paths.point_count().to_string().into()),
+                                    (
+                                        "distance",
+                                        self.settings
+                                            .ruler_unit
+                                            .format_with_angle(
+                                                total,
+                                                self.ruler_paths.angular_distance_degrees(model),
+                                                self.distance_units(),
+                                                lg,
+                                            )
+                                            .into(),
+                                    ),
+                                ],
+                            ),
+                        );
+                        ui.weak(lg.text(if cfg!(target_os = "macos") {
+                            "ruler-point-edit-help-macos"
+                        } else {
+                            "ruler-point-edit-help"
+                        }));
+                        if let Some(pair) = self.ruler_paths.last_leg() {
+                            let bearing = model
+                                .initial_bearing(pair[0], pair[1])
+                                .map(|bearing| earthcraft_core::compass::heading_text(bearing, lg))
+                                .unwrap_or_else(|| "—".into());
                             ui.label(
-                                lg.format(
-                                    "ruler-measurement-summary",
-                                    &[
-                                        (
-                                            "count",
-                                            self.ruler_paths.point_count().to_string().into(),
-                                        ),
-                                        (
-                                            "distance",
-                                            self.settings
-                                                .ruler_unit
-                                                .format_with_angle(
-                                                    total,
-                                                    self.ruler_paths
-                                                        .angular_distance_degrees(model),
-                                                    self.distance_units(),
-                                                    lg,
-                                                )
-                                                .into(),
-                                        ),
-                                    ],
+                                lg.format("ruler-bearing-label", &[("bearing", bearing.into())]),
+                            )
+                            .on_hover_text(lg.text("ruler-bearing-tooltip"));
+                        }
+                        ui.horizontal(|ui| {
+                            for (command, label, enabled) in [
+                                (
+                                    crate::app::ruler_history::HistoryCommand::Undo,
+                                    "edit-undo-action",
+                                    self.ruler_paths.can_undo(),
                                 ),
-                            );
-                            ui.weak(lg.text(if cfg!(target_os = "macos") {
-                                "ruler-point-edit-help-macos"
-                            } else {
-                                "ruler-point-edit-help"
-                            }));
-                            if let Some(pair) = self.ruler_paths.last_leg() {
-                                let bearing = model
-                                    .initial_bearing(pair[0], pair[1])
-                                    .map(|bearing| {
-                                        earthcraft_core::compass::heading_text(bearing, lg)
-                                    })
-                                    .unwrap_or_else(|| "—".into());
-                                ui.label(
-                                    lg.format(
-                                        "ruler-bearing-label",
-                                        &[("bearing", bearing.into())],
-                                    ),
-                                )
-                                .on_hover_text(lg.text("ruler-bearing-tooltip"));
-                            }
-                            ui.horizontal(|ui| {
-                                for (command, label, enabled) in [
-                                    (
-                                        crate::app::ruler_history::HistoryCommand::Undo,
-                                        "edit-undo-action",
-                                        self.ruler_paths.can_undo(),
-                                    ),
-                                    (
-                                        crate::app::ruler_history::HistoryCommand::Redo,
-                                        "edit-redo-action",
-                                        self.ruler_paths.can_redo(),
-                                    ),
-                                ] {
-                                    if ui
-                                        .add_enabled(enabled, egui::Button::new(lg.text(label)))
-                                        .clicked()
-                                    {
-                                        self.apply_ruler_history(command, ui);
-                                    }
+                                (
+                                    crate::app::ruler_history::HistoryCommand::Redo,
+                                    "edit-redo-action",
+                                    self.ruler_paths.can_redo(),
+                                ),
+                            ] {
+                                if ui
+                                    .add_enabled(enabled, egui::Button::new(lg.text(label)))
+                                    .clicked()
+                                {
+                                    self.apply_ruler_history(command, ui);
                                 }
-                            });
-                            if ui.button(lg.text("ruler-clear-action")).clicked() {
-                                self.ruler_paths.clear();
-                                self.ruler_drag = None;
                             }
                         });
+                        if ui.button(lg.text("ruler-clear-action")).clicked() {
+                            self.ruler_paths.clear();
+                            self.ruler_drag = None;
+                        }
+                    });
+
+                    self.ruler_reveal_requested = false;
 
                     egui::CollapsingHeader::new(lg.text("export-section-title"))
                         .default_open(false)

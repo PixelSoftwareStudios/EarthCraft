@@ -1,6 +1,6 @@
 mod writer;
 use crate::paths::{cache_dir, default_out_dir};
-use earthcraft_core::{earth_model::EarthModel, language::Lang, units::RulerUnit};
+use earthcraft_core::{earth_model::EarthModel, language::LanguagePreference, units::RulerUnit};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 pub use writer::SettingsWriter;
@@ -12,15 +12,16 @@ pub const MAX_MAP_SCALE: f32 = 3.0;
 fn lang_file() -> PathBuf {
     cache_dir().join("lang.txt")
 }
-pub fn load_lang() -> Lang {
-    match std::fs::read_to_string(lang_file())
+pub fn load_language_preference() -> LanguagePreference {
+    load_language_preference_at(&lang_file())
+}
+fn load_language_preference_at(path: &std::path::Path) -> LanguagePreference {
+    std::fs::read_to_string(path)
         .ok()
         .as_deref()
         .map(str::trim)
-    {
-        Some("pt-BR") => Lang::PtBr,
-        _ => Lang::En, // English is the default
-    }
+        .and_then(LanguagePreference::from_code)
+        .unwrap_or_default()
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

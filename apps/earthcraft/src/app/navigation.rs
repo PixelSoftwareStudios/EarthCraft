@@ -1,6 +1,6 @@
 use super::App;
 use earthcraft_core::flight::Flight;
-use earthcraft_core::language::Lang;
+use earthcraft_core::language::LanguagePreference;
 use eframe::egui::{Pos2, Rect};
 use std::time::Instant;
 
@@ -12,10 +12,11 @@ impl App {
             earthcraft_core::earth_model::EarthModel::PerfectSphere
         }
     }
-    pub(super) fn set_lang(&mut self, l: Lang) {
-        self.lang = l;
-        self.settings_writer.language(l);
-        self.status = l.text("app-ready-status").into();
+    pub(super) fn set_language_preference(&mut self, preference: LanguagePreference) {
+        self.language_preference = preference;
+        self.lang = preference.resolve(&sys_locale::get_locale().unwrap_or_default());
+        self.settings_writer.language(preference);
+        self.status = self.lang.text("app-ready-status").into();
         // No private Explorer field access: keep user state intact on language changes.
     }
 

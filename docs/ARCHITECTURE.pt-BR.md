@@ -32,6 +32,14 @@ O botão na barra de ferramentas permite ocultar e reabrir o painel lateral,
 preservando seus controles e seções. Buffers são reutilizados
 quando exclusivos; capturas retêm `Arc` imutável e são codificadas na thread de
 arquivos. O egui continua responsável pelo upload e desenho das texturas.
+O atalho de régua na barra ativa o mesmo estado do painel lateral e solicita a
+expansão e rolagem até seus controles, preservando pontos e histórico. A câmera
+reutiliza o trabalho de captura existente. O worker reserva nomes de PNG com
+`create_new` e acrescenta sufixos numéricos quando necessário, sem sobrescrever.
+Configurações oferece idioma do sistema ou uma escolha explícita, separada do
+`Lang` resolvido. Core resolve o idioma com fallback em inglês; o desktop detecta
+o locale e data mantém `system`, `en` ou `pt-BR` em `lang.txt`, preservando escolhas
+antigas. Sem preferência salva, o padrão acompanha o sistema a cada inicialização.
 
 ## Overlays e serviços
 

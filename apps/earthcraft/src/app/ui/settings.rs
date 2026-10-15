@@ -1,6 +1,6 @@
 use super::super::App;
 use crate::app::cache::cache_size_text;
-use earthcraft_core::language::Lang;
+use earthcraft_core::language::{Lang, LanguagePreference};
 use earthcraft_data::settings::{MAX_MAP_SCALE, MIN_MAP_SCALE, MIN_UI_SCALE};
 use earthcraft_data::settings::{Settings, UnitPreference};
 use eframe::egui;
@@ -15,11 +15,33 @@ impl App {
         let previous_model = self.settings.earth_model;
         let mut open = self.show_settings;
         let mut close_requested = false;
+        let mut language_preference = self.language_preference;
         egui::Window::new(lg.text("settings-title"))
             .open(&mut open)
             .resizable(false)
             .default_width(420.0)
             .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(lg.text("settings-language-label"));
+                    egui::ComboBox::from_id_salt("settings_language")
+                        .selected_text(language_preference.label(lg))
+                        .show_ui(ui, |ui| {
+                            super::selection::size_menu(
+                                ui,
+                                LanguagePreference::ALL
+                                    .into_iter()
+                                    .map(|choice| choice.label(lg)),
+                            );
+                            for choice in LanguagePreference::ALL {
+                                super::selection::full_width_value(
+                                    ui,
+                                    &mut language_preference,
+                                    choice,
+                                    choice.label(lg),
+                                );
+                            }
+                        });
+                });
                 ui.horizontal(|ui| {
                     ui.label(lg.text("settings-earth-model-label"));
                     let models = earthcraft_core::earth_model::EarthModel::ALL;
@@ -210,6 +232,10 @@ impl App {
                         });
                     });
             });
+        if language_preference != self.language_preference {
+            self.set_language_preference(language_preference);
+            ctx.request_repaint();
+        }
         if previous_model != self.settings.earth_model
             && self.explorer.active == earthcraft_core::body::Body::Earth
         {

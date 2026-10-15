@@ -3,7 +3,14 @@
 EarthCraft embeds [English](../crates/earthcraft-core/locales/en.ftl) and
 [Brazilian Portuguese](../crates/earthcraft-core/locales/pt-BR.ftl) Fluent catalogs.
 Editing them requires rebuilding; no translation files need to be installed next
-to the executable. The `lang.txt` preference still chooses the language.
+to the executable. **Settings → Language** defaults to **System Locale** and
+resolves the OS locale at startup and when the selection changes. Portuguese
+locales use Brazilian Portuguese; unsupported or unknown locales use English.
+The existing `lang.txt` file stores `system`, `en` or `pt-BR`. Existing `en` and
+`pt-BR` values remain explicit overrides, while missing/unknown preferences select
+System Locale. Persist the preference, never the system choice's resolved language,
+so a later OS language change is respected on the next launch. Resolution belongs
+to core; OS detection stays in the desktop and file I/O stays in data.
 
 Name keys after the feature and message role: `settings-title`,
 `search-input-placeholder`, `wayback-fallback-help`. A key stays the same when
@@ -69,6 +76,10 @@ Pontuação e ordem das palavras pertencem ao catálogo. Os arquivos ficam embut
 no executável e exigem uma recompilação depois de editar.
 
 Mantenha coordenadas pré-formatadas como strings para conservar a precisão.
+O seletor em **Configurações → Idioma** usa o idioma do sistema por padrão,
+com inglês como fallback. O arquivo `lang.txt` mantém `system`, `en` ou `pt-BR`;
+preferências antigas explícitas são preservadas. A opção `system` é resolvida
+novamente ao iniciar, sem ser substituída pelo idioma detectado.
 Use contagens numéricas e expressões de seleção do Fluent para singular e plural,
 sem terminações entre parênteses como `resultado(s)`. Mensagens ausentes usam inglês como fallback; falhas nas duas
 línguas mostram a chave. Os testes verificam sintaxe, chaves, variáveis, resolução

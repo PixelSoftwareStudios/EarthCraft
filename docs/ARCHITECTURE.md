@@ -55,6 +55,11 @@ workspace code forbids unsafe Rust. Native macOS menus stay in the desktop
 adapter; their callbacks queue actions and wake egui. Windows and Linux use
 sidebar controls. The sidebar can be collapsed from the persistent toolbar
 button; its settings and sections remain available when reopened.
+The toolbar ruler shortcut enables the sidebar's existing ruler state and
+requests that its section expand and scroll into view, retaining measurements
+and history. The camera shortcut uses the same screenshot job as the sidebar
+and native menu. The file worker reserves screenshot names with `create_new`
+and adds numeric suffixes on collisions before encoding the unchanged PNG pixels.
 
 The coordinator prepares CPU image data and matching overlay geometry before
 publication. Egui uploads textures and builds styled shapes on its own thread.
@@ -265,6 +270,12 @@ admission. Other providers stay on demand. Cache roots resolve `LOCALAPPDATA`,
 `earthcraft_tiles`. Preferences remain `settings.json` and `lang.txt`.
 
 ## Units, localization and diagnostics
+
+Settings exposes a System/explicit language preference separate from the resolved
+session `Lang`. Core resolves supported system locales with English fallback;
+the desktop uses its existing OS locale detector. Data persists `system`, `en`
+or `pt-BR` in `lang.txt`, preserving old explicit choices. Missing preferences use
+System Locale; selecting it never writes the resolved locale as an override.
 
 Coordinates use degrees, internal altitude/distances use kilometers, and raster footprints
 use meters. Core owns display conversions; the desktop detects the system locale

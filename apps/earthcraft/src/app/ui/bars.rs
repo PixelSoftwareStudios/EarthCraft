@@ -1,5 +1,4 @@
 use super::super::App;
-use earthcraft_core::language::Lang;
 use eframe::egui::{self, Key, Rect};
 use emath::GuiRounding;
 impl App {
@@ -100,25 +99,13 @@ impl App {
                         {
                             self.show_settings = !self.show_settings;
                         }
-                        let mut chosen = self.lang;
-                        egui::ComboBox::from_id_salt("lang_select")
-                            .selected_text(format!("🌐 {}", chosen.label()))
-                            .show_ui(ui, |ui| {
-                                super::selection::size_menu(
-                                    ui,
-                                    Lang::ALL.into_iter().map(|lang| lang.label()),
-                                );
-                                for l in Lang::ALL {
-                                    super::selection::full_width_value(
-                                        ui,
-                                        &mut chosen,
-                                        l,
-                                        l.label(),
-                                    );
-                                }
-                            });
-                        if chosen != self.lang {
-                            self.set_lang(chosen);
+                        if super::toolbar::screenshot_button(ui, self.image.is_some(), lg).clicked()
+                        {
+                            self.save_screenshot();
+                        }
+                        if super::toolbar::ruler_button(ui, &mut self.ruler, lg).clicked() {
+                            self.sidebar_open = true;
+                            self.ruler_reveal_requested = true;
                         }
                         let compact = match &self.status_file {
                             Some(file) if file.message == self.status => {

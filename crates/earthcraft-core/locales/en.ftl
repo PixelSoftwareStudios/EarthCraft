@@ -29,6 +29,10 @@ search-input-placeholder = Search a place, address or “lat, lon”
 search-submit-action = 🔍 Search
 
 settings-open-tooltip = Settings
+toolbar-ruler-tooltip = Measure distances
+toolbar-screenshot-tooltip = Save screenshot
+settings-language-label = Language
+settings-language-system = System Locale (Default)
 
 navigation-compass-tooltip = Click to align north up
 
