@@ -108,6 +108,62 @@ fn fixture() -> Fixture {
 }
 
 #[test]
+fn repeated_screenshots_never_overwrite_and_preserve_png_pixels_and_encoding() {
+    let fixture = fixture();
+    let requested = fixture.0.join("new-folder/earthcraft_123.png");
+    std::fs::create_dir_all(requested.parent().unwrap()).unwrap();
+    std::fs::write(&requested, b"existing screenshot").unwrap();
+    let occupied = requested.with_file_name("earthcraft_123_1.png");
+    std::fs::write(&occupied, b"another existing screenshot").unwrap();
+    let runtime = crate::runtime::ServiceRuntime::new().unwrap();
+    let (wake_tx, wakes) = mpsc::channel();
+    let (jobs, results) = FileJobs::new(runtime.handle(), move || {
+        let _ = wake_tx.send(());
+    });
+    let pixels = Arc::new(vec![10, 20, 30, 255, 40, 50, 60, 128]);
+    let reference = fixture.0.join("reference.png");
+    image::save_buffer(&reference, &pixels, 2, 1, image::ColorType::Rgba8).unwrap();
+    for _ in 0..2 {
+        jobs.screenshot(requested.clone(), 2, 1, &pixels).unwrap();
+    }
+    for suffix in [2, 3] {
+        let FileOutcome::ScreenshotSaved { path } = results
+            .recv_timeout(Duration::from_secs(10))
+            .unwrap()
+            .result
+            .unwrap()
+        else {
+            panic!("saved screenshot");
+        };
+        assert_eq!(
+            path,
+            requested.with_file_name(format!("earthcraft_123_{suffix}.png"))
+        );
+        let image = image::open(&path).unwrap().to_rgba8();
+        assert_eq!(image.dimensions(), (2, 1));
+        assert_eq!(image.as_raw(), pixels.as_ref());
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            std::fs::read(&reference).unwrap()
+        );
+        wakes.recv_timeout(Duration::from_secs(10)).unwrap();
+    }
+    assert_eq!(std::fs::read(&requested).unwrap(), b"existing screenshot");
+    assert_eq!(
+        std::fs::read(&occupied).unwrap(),
+        b"another existing screenshot"
+    );
+    // A file cannot serve as the destination directory; report the I/O failure.
+    jobs.screenshot(occupied.join("shot.png"), 2, 1, &pixels)
+        .unwrap();
+    let completion = results.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(completion.kind, FileKind::Screenshot);
+    assert!(matches!(completion.result, Err(crate::Error::Io(_))));
+    wakes.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert!(!jobs.is_busy());
+}
+
+#[test]
 fn restore_reopens_sources_in_order_prunes_missing_and_retains_other_errors() {
     let fixture = fixture();
     let session = fixture.0.join("open-kml.json");

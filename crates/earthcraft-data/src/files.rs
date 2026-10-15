@@ -1,5 +1,6 @@
 //! Ordered, bounded file jobs; native dialogs and applying results stay in app.
 mod images;
+mod screenshot;
 mod session;
 use earthcraft_core::{language::Lang, placemark::Places};
 pub use images::{ImageSource, ImageTarget, LoadedImage, PlanetSave};
@@ -91,11 +92,7 @@ impl Job {
                 Ok(FileOutcome::KmlSaved { path })
             }
             Self::Screenshot(path, width, height, pixels) => {
-                if let Some(parent) = path.parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-                image::save_buffer(&path, &pixels, width, height, image::ColorType::Rgba8)?;
-                Ok(FileOutcome::ScreenshotSaved { path })
+                screenshot::save(path, width, height, &pixels)
             }
             Self::Image(target, source) => {
                 let encoded = source.read()?;
