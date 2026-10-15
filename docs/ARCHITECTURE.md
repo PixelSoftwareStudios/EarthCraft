@@ -63,6 +63,10 @@ and adds numeric suffixes on collisions before encoding the unchanged PNG pixels
 The pin shortcut shares the sidebar's At center placemark action, including
 selected-folder insertion and localized default names. A pending reveal reopens
 Placemarks and focuses/scrolls its existing name editor into view.
+The top/bottom panel layout lives in `app/ui/bars.rs`; the search input and
+submission widgets live in `app/ui/search_bar.rs`. Query state, suggestion
+merging/debouncing and search dispatch stay in `app/search.rs`, while
+`app/ui/suggestions.rs` draws the results popup.
 
 The coordinator prepares CPU image data and matching overlay geometry before
 publication. Egui uploads textures and builds styled shapes on its own thread.

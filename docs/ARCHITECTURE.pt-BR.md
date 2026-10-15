@@ -43,6 +43,9 @@ antigas. Sem preferência salva, o padrão acompanha o sistema a cada inicializa
 O atalho de marcador reutiliza a ação No centro do painel lateral, incluindo a
 pasta selecionada e o nome padrão localizado. A solicitação de exibição reabre
 Marcadores e dá foco ao editor de nome existente, rolando até ele.
+A estrutura das barras fica em `app/ui/bars.rs`; o campo e o botão de busca ficam
+em `app/ui/search_bar.rs`. Estado, sugestões e envio das consultas permanecem em
+`app/search.rs`; `app/ui/suggestions.rs` desenha a lista de sugestões.
 
 ## Overlays e serviços
 

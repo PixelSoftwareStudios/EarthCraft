@@ -9,6 +9,7 @@ mod navigation;
 mod paths;
 pub(in crate::app) mod ruler;
 mod scale_slider;
+mod search_bar;
 mod selection;
 mod settings;
 mod sidebar;
