@@ -82,6 +82,27 @@ impl App {
                             }
                         });
                 });
+                ui.horizontal(|ui| {
+                    ui.label(lg.text("settings-earth-model-label"));
+                    let models = earthcraft_core::earth_model::EarthModel::ALL;
+                    egui::ComboBox::from_id_salt("earth_model")
+                        .selected_text(lg.text(self.settings.earth_model.name_id()))
+                        .show_ui(ui, |ui| {
+                            super::selection::size_menu(
+                                ui,
+                                models.into_iter().map(|model| lg.text(model.name_id())),
+                            );
+                            for model in models {
+                                super::selection::full_width_value(
+                                    ui,
+                                    &mut self.settings.earth_model,
+                                    model,
+                                    lg.text(model.name_id()),
+                                )
+                                .on_hover_text(lg.text(model.help_id()));
+                            }
+                        });
+                });
                 ui.separator();
                 ui.strong(lg.text("settings-text-section-title"));
                 egui::Grid::new("settings_text")
@@ -189,28 +210,6 @@ impl App {
                             ui.weak(lg.text("settings-cache-measuring-label"));
                         }
                     }
-                });
-                ui.separator();
-                ui.horizontal(|ui| {
-                    ui.label(lg.text("settings-earth-model-label"));
-                    let models = earthcraft_core::earth_model::EarthModel::ALL;
-                    egui::ComboBox::from_id_salt("earth_model")
-                        .selected_text(lg.text(self.settings.earth_model.name_id()))
-                        .show_ui(ui, |ui| {
-                            super::selection::size_menu(
-                                ui,
-                                models.into_iter().map(|model| lg.text(model.name_id())),
-                            );
-                            for model in models {
-                                super::selection::full_width_value(
-                                    ui,
-                                    &mut self.settings.earth_model,
-                                    model,
-                                    lg.text(model.name_id()),
-                                )
-                                .on_hover_text(lg.text(model.help_id()));
-                            }
-                        });
                 });
                 ui.separator();
                 egui::Frame::NONE
