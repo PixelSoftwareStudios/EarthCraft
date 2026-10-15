@@ -13,6 +13,7 @@ mod search_bar;
 mod selection;
 mod settings;
 mod sidebar;
+mod status;
 mod suggestions;
 mod toolbar;
 mod updater;

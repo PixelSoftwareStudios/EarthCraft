@@ -67,23 +67,7 @@ impl App {
                                 self.place_reveal_requested = false;
                             }
                         }
-                        let compact = match &self.status_file {
-                            Some(file) if file.message == self.status => {
-                                let full_path = file.path.to_string_lossy();
-                                self.status.replace(
-                                    full_path.as_ref(),
-                                    &super::paths::short_folder(&full_path),
-                                )
-                            }
-                            _ => self.status.clone(),
-                        };
-                        let available = ui.available_width().max(0.0);
-                        let compact = super::paths::fit_tail(ui, &compact, available);
-                        ui.add_sized(
-                            [available, ui.spacing().interact_size.y],
-                            egui::Label::new(compact).truncate(),
-                        )
-                        .on_hover_text(&self.status);
+                        super::status::show(ui, &self.status, self.status_file.as_ref());
                     });
                 });
             });

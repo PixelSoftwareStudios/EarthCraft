@@ -53,67 +53,9 @@ fn compact_path(path: &str, home: Option<&str>, windows: bool) -> String {
         components[components.len() - VISIBLE_PATH_COMPONENTS..].join("/")
     )
 }
-/// On narrow toolbars keep the filename end visible, rather than clipping it away.
-pub(super) fn fit_tail(ui: &eframe::egui::Ui, text: &str, width_points: f32) -> String {
-    use eframe::egui::{Color32, TextStyle};
-    let font = TextStyle::Body.resolve(ui.style());
-    let fits = |text: &str| {
-        ui.fonts_mut(|fonts| {
-            fonts
-                .layout_no_wrap(text.to_owned(), font.clone(), Color32::WHITE)
-                .size()
-                .x
-        }) <= width_points
-    };
-    if fits(text) {
-        return text.to_owned();
-    }
-    let boundaries: Vec<_> = text
-        .char_indices()
-        .map(|(index, _)| index)
-        .chain(std::iter::once(text.len()))
-        .collect();
-    let mut low = 0;
-    let mut high = boundaries.len() - 1;
-    while low < high {
-        let mid = (low + high) / 2;
-        if fits(&format!("...{}", &text[boundaries[mid]..])) {
-            high = mid;
-        } else {
-            low = mid + 1;
-        }
-    }
-    format!("...{}", &text[boundaries[low]..])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn narrow_labels_keep_the_filename_end_and_fit_the_available_width() {
-        use eframe::egui;
-        let ctx = egui::Context::default();
-        let _ = crate::app::test_ui::run(&ctx, egui::RawInput::default(), |ui| {
-            egui::CentralPanel::default().show(ui, |ui| {
-                let text = "1 placemark imported. — ~/Downloads/東京.kml";
-                assert_eq!(fit_tail(ui, text, 1000.0), text);
-                let fitted = fit_tail(ui, text, 110.0);
-                assert!(fitted.starts_with("..."));
-                assert!(fitted.ends_with("東京.kml"));
-                let width = ui.fonts_mut(|fonts| {
-                    fonts
-                        .layout_no_wrap(
-                            fitted,
-                            egui::TextStyle::Body.resolve(ui.style()),
-                            egui::Color32::WHITE,
-                        )
-                        .size()
-                        .x
-                });
-                assert!(width <= 110.0);
-            });
-        });
-    }
     #[test]
     fn home_abbreviation_requires_a_complete_directory_prefix() {
         assert_eq!(

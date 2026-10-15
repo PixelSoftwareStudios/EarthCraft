@@ -67,6 +67,9 @@ The top/bottom panel layout lives in `app/ui/bars.rs`; the search input and
 submission widgets live in `app/ui/search_bar.rs`. Query state, suggestion
 merging/debouncing and search dispatch stay in `app/search.rs`, while
 `app/ui/suggestions.rs` draws the results popup.
+The toolbar status readout lives in `app/ui/status.rs`, with text at 90% of the
+Body font size. It fits text using that same font, retains filename endings and
+shows the full message on hover only when text or a file path is shortened.
 
 The coordinator prepares CPU image data and matching overlay geometry before
 publication. Egui uploads textures and builds styled shapes on its own thread.

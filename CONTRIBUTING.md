@@ -251,8 +251,10 @@ Restart to check that the ruler preference persists across locales. Restart and 
 change it. System locales use the regional defaults listed in ARCHITECTURE.md. Inspect folder labels and KML
 import/save/screenshot statuses: home paths use `~/…` on macOS/Linux and
 `%USERPROFILE%\…` on Windows, other long paths retain their tail with `.../`.
-Hover for full paths/messages. Resize the window and check toolbar spacing and
-that file status text does not push language/settings controls out of view.
+The toolbar status uses slightly smaller text. Hover shortened text/paths for
+the full message; a message that fits without abbreviation must have no tooltip.
+Resize the window and change UI scale: verify filename endings remain visible
+and status text does not push toolbar buttons out of view.
 
 ## Resource-constrained builds
 

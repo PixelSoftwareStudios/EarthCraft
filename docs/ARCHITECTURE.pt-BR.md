@@ -46,6 +46,9 @@ Marcadores e dá foco ao editor de nome existente, rolando até ele.
 A estrutura das barras fica em `app/ui/bars.rs`; o campo e o botão de busca ficam
 em `app/ui/search_bar.rs`. Estado, sugestões e envio das consultas permanecem em
 `app/search.rs`; `app/ui/suggestions.rs` desenha a lista de sugestões.
+O status da barra fica em `app/ui/status.rs`, com fonte a 90% do tamanho Body.
+O ajuste usa a mesma fonte, preserva o final dos nomes de arquivo e exibe a
+mensagem completa ao passar o mouse somente quando texto ou caminho é abreviado.
 
 ## Overlays e serviços
 
