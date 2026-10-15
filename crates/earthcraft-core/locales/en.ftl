@@ -319,7 +319,7 @@ sidebar-hide-tooltip = Hide sidebar
 sidebar-show-tooltip = Show sidebar
 
 settings-distance-units-label = Distance units
-settings-units-system = System locale
+settings-units-system = System locale ({ $unit })
 settings-units-metric = Kilometers / meters
 settings-units-imperial = Miles / feet
 

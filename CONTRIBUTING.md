@@ -216,6 +216,8 @@ file dialogs, or packaging. Run the following manual checks for affected areas:
 - Switch English/Portuguese, change UI/map scales, then restart to verify persistence.
   Use Settings → Language: new installs select System Locale; test Portuguese,
   English and unsupported OS locales, explicit overrides and restart persistence.
+  Verify Distance units shows System locale (mi) or System locale (km) using
+  the OS region, including when metric/imperial is manually selected.
   Verify the System option names its resolved language even with an override
   selected; unsupported/unknown locales must show English with a fallback marker.
   Existing `lang.txt` values `en`/`pt-BR` must remain explicit; selecting System

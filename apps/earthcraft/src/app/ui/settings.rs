@@ -65,36 +65,40 @@ impl App {
                 });
                 ui.horizontal(|ui| {
                     ui.label(lg.text("settings-distance-units-label"));
-                    let label = |units| {
-                        lg.text(match units {
-                            UnitPreference::System => "settings-units-system",
-                            UnitPreference::Metric => "settings-units-metric",
-                            UnitPreference::Imperial => "settings-units-imperial",
-                        })
+                    let label = |units| match units {
+                        UnitPreference::System => lg.format(
+                            "settings-units-system",
+                            &[(
+                                "unit",
+                                match self.system_units {
+                                    earthcraft_core::units::DistanceUnits::Metric => "km",
+                                    earthcraft_core::units::DistanceUnits::Imperial => "mi",
+                                }
+                                .into(),
+                            )],
+                        ),
+                        UnitPreference::Metric => lg.text("settings-units-metric").to_owned(),
+                        UnitPreference::Imperial => lg.text("settings-units-imperial").to_owned(),
                     };
+                    let choices = [
+                        UnitPreference::System,
+                        UnitPreference::Metric,
+                        UnitPreference::Imperial,
+                    ]
+                    .map(|units| (units, label(units)));
                     egui::ComboBox::from_id_salt("distance_units")
                         .selected_text(label(self.settings.distance_units))
                         .show_ui(ui, |ui| {
                             super::selection::size_menu(
                                 ui,
-                                [
-                                    UnitPreference::System,
-                                    UnitPreference::Metric,
-                                    UnitPreference::Imperial,
-                                ]
-                                .into_iter()
-                                .map(label),
+                                choices.iter().map(|(_, label)| label.as_str()),
                             );
-                            for units in [
-                                UnitPreference::System,
-                                UnitPreference::Metric,
-                                UnitPreference::Imperial,
-                            ] {
+                            for (units, label) in &choices {
                                 super::selection::full_width_value(
                                     ui,
                                     &mut self.settings.distance_units,
-                                    units,
-                                    label(units),
+                                    *units,
+                                    label.as_str(),
                                 );
                             }
                         });
