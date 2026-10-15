@@ -2,7 +2,7 @@
 use crate::app::App;
 use eframe::egui::{self, Key, Rect};
 
-const SEARCH_FIELD_WIDTH_POINTS: f32 = 340.0;
+const SEARCH_FIELD_WIDTH_POINTS: f32 = 320.0;
 
 impl App {
     pub(super) fn search_bar(&mut self, ui: &mut egui::Ui) -> Rect {
