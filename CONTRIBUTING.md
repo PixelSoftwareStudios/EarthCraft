@@ -43,10 +43,11 @@ catch unintended dependency resolution changes. Intentional dependency updates
 should be reviewed separately, including compatibility with Rust 1.95.
 The `app-build-test` workflow runs on pushes and pull requests changing `apps/**`,
 `crates/**`, `assets/**`, the root manifest/lockfile or the workflow itself, and can
-also be run manually from Actions. It formats, lints, tests and builds default and
-profiling configurations on Ubuntu using stable Rust, checks the CPU-only desktop,
-using stable Rust in a single verification job. Rust 1.95 remains the declared
-minimum; CI does not run a separate minimum-version job. Use the latest supported major version tags for GitHub
+also be run manually from Actions. One stable-Rust verification job formats,
+lints, tests and builds the default configuration on Ubuntu and checks the
+CPU-only desktop. Profiling checks remain available locally and do not run in CI.
+Rust 1.95 remains the declared minimum; CI does not run a separate minimum-version
+job. Use the latest supported major version tags for GitHub
 Actions, rather than commit hashes. For actions without version tags, follow the
 maintained upstream branch. Keep Rust toolchain versions explicit.
 
