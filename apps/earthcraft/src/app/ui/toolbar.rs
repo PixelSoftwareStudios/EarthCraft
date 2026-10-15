@@ -13,7 +13,7 @@ enum Icon {
 pub(super) fn ruler_button(ui: &mut egui::Ui, ruler: &mut bool, lang: Lang) -> egui::Response {
     let response = icon_button(ui, Icon::Ruler, *ruler, lang.text("toolbar-ruler-tooltip"));
     if response.clicked() {
-        *ruler = true;
+        *ruler = !*ruler;
     }
     response
 }

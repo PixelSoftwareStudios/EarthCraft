@@ -50,7 +50,19 @@ fn ruler_shortcut_and_sidebar_checkbox_share_state_and_camera_requires_an_image(
     click(&mut ruler, false, rectangles[0]);
     assert!(ruler);
     click(&mut ruler, false, rectangles[0]);
-    assert!(ruler, "reopening the ruler must not toggle it off");
+    assert!(
+        !ruler,
+        "clicking the active toolbar ruler switches measuring off"
+    );
+    click(&mut ruler, false, rectangles[1]);
+    assert!(ruler, "the sidebar can enable the same state");
+    click(&mut ruler, false, rectangles[0]);
+    assert!(
+        !ruler,
+        "the toolbar can disable measuring enabled in the sidebar"
+    );
+    click(&mut ruler, false, rectangles[0]);
+    assert!(ruler);
     click(&mut ruler, false, rectangles[1]);
     assert!(!ruler, "the sidebar controls the same state");
     click(&mut ruler, false, rectangles[0]);

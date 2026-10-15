@@ -61,7 +61,7 @@ Arrastar: girar o globo · Clique com o botão direito: menu de contexto do loca
 Clique em **Altitude da câmera** na barra inferior para informar uma altitude exata.
 
 Use **☰** na barra de ferramentas para ocultar ou reabrir o painel lateral e dar mais espaço ao mapa.
-O botão de régua ativa a medição e exibe os controles da Régua; o botão de câmera
+O botão de régua ativa ou desativa a medição e exibe os controles ao ativá-la; o botão de câmera
 salva um PNG na pasta de capturas das Configurações, sem abrir um diálogo.
 Em **Configurações → Idioma**, siga o idioma do sistema (padrão) ou escolha
 English ou Português (Brasil). Idiomas do sistema sem tradução usam inglês.

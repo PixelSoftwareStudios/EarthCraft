@@ -55,9 +55,9 @@ workspace code forbids unsafe Rust. Native macOS menus stay in the desktop
 adapter; their callbacks queue actions and wake egui. Windows and Linux use
 sidebar controls. The sidebar can be collapsed from the persistent toolbar
 button; its settings and sections remain available when reopened.
-The toolbar ruler shortcut enables the sidebar's existing ruler state and
-requests that its section expand and scroll into view, retaining measurements
-and history. The camera shortcut uses the same screenshot job as the sidebar
+The toolbar ruler shortcut toggles the sidebar's existing ruler state and,
+when enabling it, requests that its section expand and scroll into view,
+retaining measurements and history. The camera shortcut uses the same screenshot job as the sidebar
 and native menu. The file worker reserves screenshot names with `create_new`
 and adds numeric suffixes on collisions before encoding the unchanged PNG pixels.
 

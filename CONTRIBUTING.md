@@ -168,7 +168,9 @@ file dialogs, or packaging. Run the following manual checks for affected areas:
   Collapse the Ruler section, scroll away, then hide the sidebar. Click the
   toolbar ruler: the sidebar must reopen, expand Ruler and scroll its controls
   into view. Toggle the sidebar checkbox and check the toolbar's selected state.
-  Click the ruler again with measurements and undo/redo history: retain both.
+  Click the ruler again with measurements and undo/redo history: measuring must
+  switch off, unchecking Measure distances while retaining both. Click again to
+  re-enable it and reveal the controls with the same measurements and history.
   Click the camera repeatedly: save clean PNGs to the configured folder without
   dialogs or overwrites, preserving pixels/resolution/attribution. Before the
   first frame, the camera must be disabled. Use an unwritable folder and check
