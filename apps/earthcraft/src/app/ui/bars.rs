@@ -103,10 +103,17 @@ impl App {
                         {
                             self.save_screenshot();
                         }
+                        if super::toolbar::placemark_button(ui, lg).clicked() {
+                            self.add_center_placemark();
+                            self.sidebar_open = true;
+                            self.place_reveal_requested = true;
+                            self.ruler_reveal_requested = false;
+                        }
                         if super::toolbar::ruler_button(ui, &mut self.ruler, lg).clicked() {
                             self.ruler_reveal_requested = self.ruler;
                             if self.ruler {
                                 self.sidebar_open = true;
+                                self.place_reveal_requested = false;
                             }
                         }
                         let compact = match &self.status_file {

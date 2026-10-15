@@ -40,6 +40,9 @@ Configurações oferece idioma do sistema ou uma escolha explícita, separada do
 `Lang` resolvido. Core resolve o idioma com fallback em inglês; o desktop detecta
 o locale e data mantém `system`, `en` ou `pt-BR` em `lang.txt`, preservando escolhas
 antigas. Sem preferência salva, o padrão acompanha o sistema a cada inicialização.
+O atalho de marcador reutiliza a ação No centro do painel lateral, incluindo a
+pasta selecionada e o nome padrão localizado. A solicitação de exibição reabre
+Marcadores e dá foco ao editor de nome existente, rolando até ele.
 
 ## Overlays e serviços
 

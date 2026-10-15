@@ -30,6 +30,7 @@ search-submit-action = 🔍 Buscar
 
 settings-open-tooltip = Configurações
 toolbar-ruler-tooltip = Medir distâncias
+toolbar-placemark-tooltip = Adicionar marcador
 toolbar-screenshot-tooltip = Salvar captura
 settings-language-label = Idioma
 settings-language-system = Idioma do sistema (padrão)

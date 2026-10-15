@@ -30,6 +30,7 @@ search-submit-action = 🔍 Search
 
 settings-open-tooltip = Settings
 toolbar-ruler-tooltip = Measure distances
+toolbar-placemark-tooltip = Add placemark
 toolbar-screenshot-tooltip = Save screenshot
 settings-language-label = Language
 settings-language-system = System Locale (Default)

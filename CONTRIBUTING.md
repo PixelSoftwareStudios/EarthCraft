@@ -171,6 +171,11 @@ file dialogs, or packaging. Run the following manual checks for affected areas:
   Click the ruler again with measurements and undo/redo history: measuring must
   switch off, unchecking Measure distances while retaining both. Click again to
   re-enable it and reveal the controls with the same measurements and history.
+  Click the toolbar pin with the sidebar hidden and Placemarks collapsed: add
+  one marker at the camera center, reopen/expand the sidebar, scroll to its
+  selected name field and focus it for editing. Check generated names in both
+  languages, an entered name and insertion into a selected folder. Save/reopen
+  KML to verify the marker uses the existing file workflow.
   Click the camera repeatedly: save clean PNGs to the configured folder without
   dialogs or overwrites, preserving pixels/resolution/attribution. Before the
   first frame, the camera must be disabled. Use an unwritable folder and check

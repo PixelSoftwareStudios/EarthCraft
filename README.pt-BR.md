@@ -63,6 +63,8 @@ Clique em **Altitude da câmera** na barra inferior para informar uma altitude e
 Use **☰** na barra de ferramentas para ocultar ou reabrir o painel lateral e dar mais espaço ao mapa.
 O botão de régua ativa ou desativa a medição e exibe os controles ao ativá-la; o botão de câmera
 salva um PNG na pasta de capturas das Configurações, sem abrir um diálogo.
+O botão de marcador adiciona um ponto no centro da câmera e exibe seu nome e
+detalhes no painel lateral. A ordem é Régua, Adicionar marcador, Captura, Configurações.
 Em **Configurações → Idioma**, siga o idioma do sistema (padrão) ou escolha
 English ou Português (Brasil). Idiomas do sistema sem tradução usam inglês.
 

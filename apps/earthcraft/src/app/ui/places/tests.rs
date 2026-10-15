@@ -1,6 +1,79 @@
 use super::*;
 
 #[test]
+fn center_placemark_preserves_folder_naming_coordinates_and_selects_new_marker() {
+    for lang in Lang::ALL {
+        let folder = PlaceNode::folder("Favorites".into(), String::new(), false, Vec::new());
+        let mut selection = Some(folder.id());
+        let mut places = Places {
+            roots: vec![folder],
+        };
+        let mut name = "  Favorite spot  ".to_owned();
+        let center = (-23.550_519_9, -46.633_309_4);
+        add_center_placemark(&mut places, &mut selection, &mut name, center, lang);
+        assert_eq!(places.roots.len(), 1, "insert into the selected folder");
+        let PlaceItem::Folder { children, .. } = &places.roots[0].item else {
+            panic!("folder");
+        };
+        assert_eq!(children.len(), 1);
+        assert_eq!(selection, Some(children[0].id()));
+        let PlaceItem::Marker(marker) = &children[0].item else {
+            panic!("marker");
+        };
+        assert_eq!(marker.name, "Favorite spot");
+        assert_eq!((marker.lat, marker.lon), center);
+        assert!(name.is_empty());
+
+        // A selected marker is not an insertion folder; use My Places instead.
+        add_center_placemark(&mut places, &mut selection, &mut name, (90.0, 180.0), lang);
+        assert_eq!(places.roots.len(), 2);
+        assert_eq!(selection, Some(places.roots[1].id()));
+        let PlaceItem::Marker(marker) = &places.roots[1].item else {
+            panic!("marker");
+        };
+        assert_eq!(
+            marker.name,
+            lang.format("placemarks-generated-name", &[("number", "2".into())])
+        );
+        assert_eq!((marker.lat, marker.lon), (90.0, 180.0));
+        assert!(marker.desc.is_empty());
+    }
+}
+
+#[test]
+fn revealing_selected_name_focuses_and_scrolls_the_existing_editor_into_view() {
+    let ctx = egui::Context::default();
+    ctx.global_style_mut(|style| style.scroll_animation = egui::style::ScrollAnimation::none());
+    let mut name = "New placemark".to_owned();
+    for frame in 0..8 {
+        let _ = crate::app::test_ui::run(
+            &ctx,
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(300.0, 200.0),
+                )),
+                time: Some(f64::from(frame) * 0.2),
+                ..Default::default()
+            },
+            |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        ui.allocate_space(egui::vec2(100.0, 600.0));
+                        let response = selected_name_editor(ui, &mut name, frame == 2);
+                        if frame >= 5 {
+                            assert!(response.has_focus());
+                            assert!(ui.clip_rect().contains_rect(response.rect));
+                        }
+                    });
+                });
+            },
+        );
+    }
+    assert_eq!(name, "New placemark");
+}
+
+#[test]
 fn tree_reserves_its_height_even_near_the_bottom_of_the_sidebar() {
     let ctx = egui::Context::default();
     for rows in [1, 100] {

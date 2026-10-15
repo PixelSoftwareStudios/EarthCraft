@@ -62,6 +62,8 @@ Click **Camera altitude** in the bottom bar to enter an exact altitude.
 Use **☰** in the toolbar to hide or reopen the sidebar and give the map more room.
 The ruler button toggles measuring and reveals its controls when enabled. The
 camera button saves a PNG to the screenshot folder in Settings without a dialog.
+The pin button adds a placemark at the camera center and opens its name and
+details in the sidebar. Toolbar order: Ruler, Add placemark, Screenshot, Settings.
 Choose **Settings → Language** to follow the system locale (the default), use
 English or use Português (Brasil). Unsupported system languages fall back to English.
 

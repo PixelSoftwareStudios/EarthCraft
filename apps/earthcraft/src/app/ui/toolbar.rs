@@ -7,6 +7,7 @@ const ICON_STROKE_POINTS: f32 = 1.25;
 #[derive(Clone, Copy)]
 enum Icon {
     Ruler,
+    Pin,
     Camera,
 }
 
@@ -28,6 +29,10 @@ pub(super) fn screenshot_button(ui: &mut egui::Ui, available: bool, lang: Lang) 
         )
     })
     .inner
+}
+
+pub(super) fn placemark_button(ui: &mut egui::Ui, lang: Lang) -> egui::Response {
+    icon_button(ui, Icon::Pin, false, lang.text("toolbar-placemark-tooltip"))
 }
 
 fn icon_button(ui: &mut egui::Ui, icon: Icon, selected: bool, tooltip: &str) -> egui::Response {
@@ -70,6 +75,22 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, stroke: egu
                 let bottom = if index % 2 == 0 { 0.6 } else { 0.48 };
                 painter.line_segment([point(x, 0.25), point(x, bottom)], stroke);
             }
+        }
+        Icon::Pin => {
+            painter.add(egui::Shape::closed_line(
+                vec![
+                    point(0.5, 0.95),
+                    point(0.17, 0.46),
+                    point(0.15, 0.28),
+                    point(0.25, 0.1),
+                    point(0.5, 0.05),
+                    point(0.75, 0.1),
+                    point(0.85, 0.28),
+                    point(0.83, 0.46),
+                ],
+                stroke,
+            ));
+            painter.circle_stroke(point(0.5, 0.3), rect.width() * 0.12, stroke);
         }
         Icon::Camera => {
             painter.add(egui::Shape::closed_line(

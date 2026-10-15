@@ -2,7 +2,7 @@
 use crate::app::App;
 use earthcraft_core::{
     language::Lang,
-    placemark::{PlaceItem, PlaceNode, Placemark},
+    placemark::{PlaceItem, PlaceNode, Placemark, Places},
 };
 use eframe::egui::{self, collapsing_header::CollapsingState};
 
@@ -192,6 +192,16 @@ fn nodes(
 }
 
 impl App {
+    pub(in crate::app) fn add_center_placemark(&mut self) {
+        add_center_placemark(
+            &mut self.placemarks,
+            &mut self.place_selection,
+            &mut self.new_name,
+            (self.cam.lat, self.cam.lon),
+            self.lang,
+        );
+    }
+
     pub(in crate::app) fn places_tree(&mut self, ui: &mut egui::Ui) -> Option<(f64, f64, f64)> {
         let lang = self.lang;
         let mut goto = None;
@@ -211,23 +221,7 @@ impl App {
                 .button(lang.text("placemarks-add-center-action"))
                 .clicked()
             {
-                let name = if self.new_name.trim().is_empty() {
-                    lang.format(
-                        "placemarks-generated-name",
-                        &[("number", (self.placemarks.len() + 1).to_string().into())],
-                    )
-                } else {
-                    self.new_name.trim().to_owned()
-                };
-                let node = PlaceNode::marker(Placemark {
-                    name,
-                    desc: String::new(),
-                    lat: self.cam.lat,
-                    lon: self.cam.lon,
-                });
-                self.place_selection = Some(node.id());
-                self.placemarks.insert(parent, node);
-                self.new_name.clear();
+                self.add_center_placemark();
             }
             if ui.button(lang.text("places-add-folder-action")).clicked() {
                 let name = if self.new_name.trim().is_empty() {
@@ -276,7 +270,7 @@ impl App {
             && let Some(node) = self.placemarks.find_mut(id)
         {
             ui.add_space(4.0);
-            ui.add(egui::TextEdit::singleline(node.name_mut()).desired_width(f32::INFINITY));
+            selected_name_editor(ui, node.name_mut(), self.place_reveal_requested);
             description_editor(ui, id, node.description_mut(), lang);
             ui.horizontal(|ui| {
                 if let PlaceItem::Marker(pm) = &node.item
@@ -301,6 +295,46 @@ impl App {
         }
         goto
     }
+}
+
+fn add_center_placemark(
+    places: &mut Places,
+    selection: &mut Option<u64>,
+    new_name: &mut String,
+    center: (f64, f64),
+    lang: Lang,
+) {
+    let parent = selection.filter(|id| {
+        places
+            .find_mut(*id)
+            .is_some_and(|node| matches!(node.item, PlaceItem::Folder { .. }))
+    });
+    let name = if new_name.trim().is_empty() {
+        lang.format(
+            "placemarks-generated-name",
+            &[("number", (places.len() + 1).to_string().into())],
+        )
+    } else {
+        new_name.trim().to_owned()
+    };
+    let node = PlaceNode::marker(Placemark {
+        name,
+        desc: String::new(),
+        lat: center.0,
+        lon: center.1,
+    });
+    *selection = Some(node.id());
+    places.insert(parent, node);
+    new_name.clear();
+}
+
+fn selected_name_editor(ui: &mut egui::Ui, name: &mut String, reveal: bool) -> egui::Response {
+    let response = ui.add(egui::TextEdit::singleline(name).desired_width(f32::INFINITY));
+    if reveal {
+        response.request_focus();
+        response.scroll_to_me(Some(egui::Align::Center));
+    }
+    response
 }
 
 #[cfg(test)]

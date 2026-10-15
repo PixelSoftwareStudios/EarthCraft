@@ -60,6 +60,9 @@ when enabling it, requests that its section expand and scroll into view,
 retaining measurements and history. The camera shortcut uses the same screenshot job as the sidebar
 and native menu. The file worker reserves screenshot names with `create_new`
 and adds numeric suffixes on collisions before encoding the unchanged PNG pixels.
+The pin shortcut shares the sidebar's At center placemark action, including
+selected-folder insertion and localized default names. A pending reveal reopens
+Placemarks and focuses/scrolls its existing name editor into view.
 
 The coordinator prepares CPU image data and matching overlay geometry before
 publication. Egui uploads textures and builds styled shapes on its own thread.

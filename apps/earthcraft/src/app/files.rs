@@ -50,6 +50,7 @@ impl App {
     pub(super) fn clear_places(&mut self) {
         self.placemarks = Default::default();
         self.place_selection = None;
+        self.place_reveal_requested = false;
         self.kml_path = "placemarks.kml".into();
         self.kml_session.clear();
         self.settings_writer.kml_paths(&self.kml_session.paths);

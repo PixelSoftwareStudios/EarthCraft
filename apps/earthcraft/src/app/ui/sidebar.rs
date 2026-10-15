@@ -236,8 +236,11 @@ impl App {
                             }
                         });
 
-                    egui::CollapsingHeader::new(lg.text("placemarks-section-title"))
+                    let places_title = lg.text("placemarks-section-title");
+                    let placemarks_section = egui::CollapsingHeader::new(places_title)
+                        .id_salt("placemarks-section")
                         .default_open(true)
+                        .open(self.place_reveal_requested.then_some(true))
                         .show(ui, |ui| {
                             if let Some(target) = self.places_tree(ui) {
                                 goto = Some(target);
@@ -299,6 +302,10 @@ impl App {
                                 self.clear_places();
                             }
                         });
+
+                    if self.place_reveal_requested && placemarks_section.fully_open() {
+                        self.place_reveal_requested = false;
+                    }
 
                     super::ruler::section(ui, lg, self.ruler_reveal_requested, |ui| {
                         ui.checkbox(&mut self.ruler, lg.text("ruler-enable-toggle"));
