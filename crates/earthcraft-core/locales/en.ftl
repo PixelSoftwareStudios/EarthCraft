@@ -33,7 +33,8 @@ toolbar-ruler-tooltip = Measure distances
 toolbar-placemark-tooltip = Add placemark
 toolbar-screenshot-tooltip = Save screenshot
 settings-language-label = Language
-settings-language-system = System Locale (Default)
+settings-language-system = System locale ({ $language })
+settings-language-system-fallback = System locale ({ $language } — fallback)
 
 navigation-compass-tooltip = Click to align north up
 

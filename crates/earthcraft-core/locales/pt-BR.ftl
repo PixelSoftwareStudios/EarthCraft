@@ -33,7 +33,8 @@ toolbar-ruler-tooltip = Medir distâncias
 toolbar-placemark-tooltip = Adicionar marcador
 toolbar-screenshot-tooltip = Salvar captura
 settings-language-label = Idioma
-settings-language-system = Idioma do sistema (padrão)
+settings-language-system = Idioma do sistema ({ $language })
+settings-language-system-fallback = Idioma do sistema ({ $language } — idioma alternativo)
 
 navigation-compass-tooltip = Clique para alinhar ao norte
 

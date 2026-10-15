@@ -23,21 +23,21 @@ impl App {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(lg.text("settings-language-label"));
+                    let choices = LanguagePreference::ALL
+                        .map(|choice| (choice, choice.label(lg, &self.system_locale)));
                     egui::ComboBox::from_id_salt("settings_language")
-                        .selected_text(language_preference.label(lg))
+                        .selected_text(language_preference.label(lg, &self.system_locale))
                         .show_ui(ui, |ui| {
                             super::selection::size_menu(
                                 ui,
-                                LanguagePreference::ALL
-                                    .into_iter()
-                                    .map(|choice| choice.label(lg)),
+                                choices.iter().map(|(_, label)| label.as_str()),
                             );
-                            for choice in LanguagePreference::ALL {
+                            for (choice, label) in &choices {
                                 super::selection::full_width_value(
                                     ui,
                                     &mut language_preference,
-                                    choice,
-                                    choice.label(lg),
+                                    *choice,
+                                    label.as_str(),
                                 );
                             }
                         });

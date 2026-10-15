@@ -14,7 +14,8 @@ impl App {
     }
     pub(super) fn set_language_preference(&mut self, preference: LanguagePreference) {
         self.language_preference = preference;
-        self.lang = preference.resolve(&sys_locale::get_locale().unwrap_or_default());
+        self.system_locale = sys_locale::get_locale().unwrap_or_default();
+        self.lang = preference.resolve(&self.system_locale);
         self.settings_writer.language(preference);
         self.status = self.lang.text("app-ready-status").into();
         // No private Explorer field access: keep user state intact on language changes.

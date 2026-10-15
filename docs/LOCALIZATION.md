@@ -6,6 +6,10 @@ Editing them requires rebuilding; no translation files need to be installed next
 to the executable. **Settings → Language** defaults to **System Locale** and
 resolves the OS locale at startup and when the selection changes. Portuguese
 locales use Brazilian Portuguese; unsupported or unknown locales use English.
+The System option includes the resolved language, for example **System locale
+(English)** or **System locale (Português (Brasil))**, even when an explicit
+override is active. Unsupported or unknown locales show **System locale
+(English — fallback)**. These whole labels are localized in both catalogs.
 The existing `lang.txt` file stores `system`, `en` or `pt-BR`. Existing `en` and
 `pt-BR` values remain explicit overrides, while missing/unknown preferences select
 System Locale. Persist the preference, never the system choice's resolved language,

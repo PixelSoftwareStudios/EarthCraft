@@ -61,25 +61,43 @@ impl LanguagePreference {
     pub fn resolve(self, system_locale: &str) -> Lang {
         match self {
             Self::Explicit(lang) => lang,
-            Self::System => {
-                let locale = system_locale
-                    .split(['.', '@'])
-                    .next()
-                    .unwrap_or(system_locale)
-                    .replace('_', "-")
-                    .parse::<unic_langid::LanguageIdentifier>();
-                match locale {
-                    Ok(id) if id.language.as_str() == "pt" => Lang::PtBr,
-                    _ => Lang::En,
-                }
-            }
+            Self::System => Self::system_language(system_locale).unwrap_or(Lang::En),
         }
     }
 
-    pub fn label(self, lang: Lang) -> &'static str {
+    fn system_language(system_locale: &str) -> Option<Lang> {
+        let locale = system_locale
+            .split(['.', '@'])
+            .next()
+            .unwrap_or(system_locale)
+            .replace('_', "-")
+            .parse::<unic_langid::LanguageIdentifier>()
+            .ok()?;
+        match locale.language.as_str() {
+            "en" => Some(Lang::En),
+            "pt" => Some(Lang::PtBr),
+            _ => None,
+        }
+    }
+
+    pub fn label(self, lang: Lang, system_locale: &str) -> String {
         match self {
-            Self::System => lang.text("settings-language-system"),
-            Self::Explicit(language) => language.label(),
+            Self::System => {
+                let system_language = Self::system_language(system_locale);
+                let message = if system_language.is_some() {
+                    "settings-language-system"
+                } else {
+                    "settings-language-system-fallback"
+                };
+                lang.format(
+                    message,
+                    &[(
+                        "language",
+                        system_language.unwrap_or(Lang::En).label().into(),
+                    )],
+                )
+            }
+            Self::Explicit(language) => language.label().into(),
         }
     }
 }
@@ -131,6 +149,45 @@ mod tests {
         assert_eq!(preference.code(), "system");
         assert_eq!(preference.resolve("pt-BR"), Lang::PtBr);
         assert_eq!(preference.resolve("en-US"), Lang::En);
+    }
+    #[test]
+    fn system_labels_show_the_resolved_language_and_identify_fallbacks() {
+        let system = LanguagePreference::System;
+        for locale in ["en-US", "en_GB.UTF-8"] {
+            assert_eq!(system.label(Lang::En, locale), "System locale (English)");
+        }
+        for locale in ["pt-BR", "pt-PT", "pt_BR.UTF-8"] {
+            assert_eq!(
+                system.label(Lang::En, locale),
+                "System locale (Português (Brasil))"
+            );
+        }
+        for locale in ["fr-FR", "ja-JP", "", "C", "bad_locale"] {
+            assert_eq!(
+                system.label(Lang::En, locale),
+                "System locale (English — fallback)"
+            );
+            assert_eq!(
+                system.label(Lang::PtBr, locale),
+                "Idioma do sistema (English — idioma alternativo)"
+            );
+        }
+        assert_eq!(
+            system.label(Lang::PtBr, "pt-BR"),
+            "Idioma do sistema (Português (Brasil))"
+        );
+        assert_eq!(
+            system.label(Lang::PtBr, "en-US"),
+            "Idioma do sistema (English)"
+        );
+        for language in Lang::ALL {
+            for ui_language in Lang::ALL {
+                assert_eq!(
+                    LanguagePreference::Explicit(language).label(ui_language, "fr-FR"),
+                    language.label()
+                );
+            }
+        }
     }
     #[test]
     fn names_match_across_canonical_accents_and_case_without_transliterating_scripts() {
