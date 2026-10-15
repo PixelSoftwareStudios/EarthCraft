@@ -3,6 +3,7 @@ use earthcraft_core::language::Lang;
 use eframe::egui;
 
 const ICON_STROKE_POINTS: f32 = 1.25;
+const PIN_GRID_UNITS: f32 = 24.0;
 
 #[derive(Clone, Copy)]
 enum Icon {
@@ -77,20 +78,29 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, stroke: egu
             }
         }
         Icon::Pin => {
-            painter.add(egui::Shape::closed_line(
-                vec![
-                    point(0.5, 0.95),
-                    point(0.12, 0.64),
-                    point(0.05, 0.4),
-                    point(0.18, 0.13),
-                    point(0.5, 0.05),
-                    point(0.82, 0.13),
-                    point(0.95, 0.4),
-                    point(0.88, 0.64),
-                ],
-                stroke,
-            ));
-            painter.circle_stroke(point(0.5, 0.38), rect.width() * 0.18, stroke);
+            // Scale both axes equally so the rounded head stays circular.
+            let scale = rect.width().min(rect.height()) / PIN_GRID_UNITS;
+            let at = |x, y| {
+                rect.center()
+                    + egui::vec2(x - PIN_GRID_UNITS / 2.0, y - PIN_GRID_UNITS / 2.0) * scale
+            };
+            let mut outline = Vec::new();
+            for curve in [
+                [(20.0, 10.0), (20.0, 15.0), (12.0, 22.0), (12.0, 22.0)],
+                [(12.0, 22.0), (12.0, 22.0), (4.0, 15.0), (4.0, 10.0)],
+                [(4.0, 10.0), (4.0, 5.58), (7.58, 2.0), (12.0, 2.0)],
+                [(12.0, 2.0), (16.42, 2.0), (20.0, 5.58), (20.0, 10.0)],
+            ] {
+                let curve = egui::epaint::CubicBezierShape::from_points_stroke(
+                    curve.map(|(x, y)| at(x, y)),
+                    false,
+                    egui::Color32::TRANSPARENT,
+                    stroke,
+                );
+                outline.extend(curve.flatten(None));
+            }
+            painter.add(egui::Shape::closed_line(outline, stroke));
+            painter.circle_stroke(at(12.0, 10.0), 3.0 * scale, stroke);
         }
         Icon::Camera => {
             painter.add(egui::Shape::closed_line(

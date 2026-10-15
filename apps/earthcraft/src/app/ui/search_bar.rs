@@ -2,6 +2,8 @@
 use crate::app::App;
 use eframe::egui::{self, Key, Rect};
 
+const SEARCH_FIELD_WIDTH_POINTS: f32 = 340.0;
+
 impl App {
     pub(super) fn search_bar(&mut self, ui: &mut egui::Ui) -> Rect {
         let lg = self.lang;
@@ -29,7 +31,7 @@ impl App {
         let r = ui.add(
             egui::TextEdit::singleline(&mut self.query)
                 .hint_text(lg.text("search-input-placeholder"))
-                .desired_width(340.0 * self.settings.ui_scale.max(1.0)),
+                .desired_width(SEARCH_FIELD_WIDTH_POINTS * self.settings.ui_scale.max(1.0)),
         );
         if r.changed() {
             self.on_query_changed();
