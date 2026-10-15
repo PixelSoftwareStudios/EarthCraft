@@ -80,17 +80,17 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, stroke: egu
             painter.add(egui::Shape::closed_line(
                 vec![
                     point(0.5, 0.95),
-                    point(0.17, 0.46),
-                    point(0.15, 0.28),
-                    point(0.25, 0.1),
+                    point(0.12, 0.64),
+                    point(0.05, 0.4),
+                    point(0.18, 0.13),
                     point(0.5, 0.05),
-                    point(0.75, 0.1),
-                    point(0.85, 0.28),
-                    point(0.83, 0.46),
+                    point(0.82, 0.13),
+                    point(0.95, 0.4),
+                    point(0.88, 0.64),
                 ],
                 stroke,
             ));
-            painter.circle_stroke(point(0.5, 0.3), rect.width() * 0.12, stroke);
+            painter.circle_stroke(point(0.5, 0.38), rect.width() * 0.18, stroke);
         }
         Icon::Camera => {
             painter.add(egui::Shape::closed_line(
