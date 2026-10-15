@@ -78,3 +78,5 @@ jobs:
         run: cargo clippy -p earthcraft --all-targets --no-default-features --locked -- -D warnings
       - name: Build desktop application
         run: cargo build --workspace --locked
+      - name: Lint profiling configuration
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
