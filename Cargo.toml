@@ -32,7 +32,9 @@ mgrs-convert = "0.1.0"
 sofars = "0.6.1"
 png = "0.18.1"
 ab_glyph = "0.2.32"
-gilrs = "0.11.2"
+# Build only the native gamepad/HID subsystems; eframe owns presentation.
+sdl3-sys = { version = "0.7.2", default-features = false, features = ["no-default-subsystems", "sdl-joystick", "sdl-hidapi", "sdl-unix-console-build"] }
+sdl3 = { version = "0.20.0", default-features = false, features = ["build-from-source-static"] }
 fontdb = { version = "0.24.0", default-features = false, features = ["std", "fs", "fontconfig"] }
 geographiclib-rs = { version = "0.2.7", default-features = false }
 glam = { version = "0.34.1", default-features = false, features = ["std", "f64"] }

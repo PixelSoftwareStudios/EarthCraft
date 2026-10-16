@@ -200,7 +200,8 @@ A matemática da câmera permanece em core. Veja [configurações](features/SETT
 ## Controles
 
 Core trata vínculos normalizados, zona morta/curvas, bordas de botões e passos da
-câmera. Data persiste perfis por modelo. O adaptador gilrs do aplicativo consulta
+câmera, incluindo inclinação limitada a partir do nadir. Data persiste perfis por modelo e
+carrega câmeras/perfis antigos com valores padrão para inclinação. O adaptador SDL3 do aplicativo consulta
 conexão/entradas, respeita foco e encaminha ferramentas pelo dispatcher dos menus.
 Veja [controles](features/CONTROLLERS.pt-BR.md) para limites de dispositivos/plataformas.
 

@@ -311,6 +311,7 @@ mod tests {
     #[test]
     fn picking_tracks_displayed_camera_while_new_view_is_pending() {
         let shown = Cam {
+            tilt: 0.0,
             lat: 20.0,
             lon: 30.0,
             heading: 0.0,

@@ -11,6 +11,7 @@ use eframe::egui::{
 use std::time::{Duration, Instant};
 mod ruler_input;
 
+const DRAG_TILT_DEG_PER_POINT: f64 = 0.2;
 const DRAG_HEADING_DEG_PER_POINT: f64 = 0.3;
 const SCROLL_ZOOM_RATE_PER_POINT: f64 = 0.0025;
 const POINT_FLY_ALTITUDE_RATIO: f64 = 0.35;
@@ -46,7 +47,18 @@ impl App {
 
         // ── input
         let mut interacting = self.controller_input(ui, rect.height());
-        if !ruler_captured && resp.dragged_by(PointerButton::Primary) && !shift {
+        if !ruler_captured
+            && resp.dragged_by(PointerButton::Middle)
+            && self.explorer.active == earthcraft_core::body::Body::Earth
+        {
+            self.fly = None;
+            self.cam.tilt_by(
+                -f64::from(ui.input(|i| i.pointer.delta().y))
+                    * DRAG_TILT_DEG_PER_POINT
+                    * self.settings.navigation.rotation_sensitivity,
+            );
+            interacting = true;
+        } else if !ruler_captured && resp.dragged_by(PointerButton::Primary) && !shift {
             let d =
                 ui.input(|i| i.pointer.delta()) * self.settings.navigation.pan_sensitivity as f32;
             self.fly = None;
@@ -142,6 +154,11 @@ impl App {
             }
             if zout {
                 self.zoom((KEYBOARD_ZOOM_RATE_PER_SEC * dt).exp());
+                interacting = true;
+            }
+            if ui.input(|i| i.key_pressed(Key::R)) {
+                self.fly = None;
+                self.cam.reset_view();
                 interacting = true;
             }
             if north {

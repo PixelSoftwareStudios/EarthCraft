@@ -12,6 +12,7 @@ struct ReferenceFrame {
 fn raster_matches_regression_fixtures() {
     let (w, h) = (64, 48);
     let basis = Cam {
+        tilt: 0.0,
         lat: -15.0,
         lon: -50.0,
         heading: 25.0,
@@ -114,6 +115,7 @@ fn batch_references() -> [BatchReference; 6] {
             height: 49,
             provider: Provider::Satellite,
             cam: Cam {
+                tilt: 0.0,
                 lat: -15.0,
                 lon: -50.0,
                 heading: 25.0,
@@ -126,6 +128,7 @@ fn batch_references() -> [BatchReference; 6] {
             height: 51,
             provider: Provider::Streets,
             cam: Cam {
+                tilt: 0.0,
                 lat: 89.9,
                 lon: 179.9,
                 heading: -130.0,
@@ -138,6 +141,7 @@ fn batch_references() -> [BatchReference; 6] {
             height: 47,
             provider: Provider::Topo,
             cam: Cam {
+                tilt: 0.0,
                 lat: -40.0,
                 lon: 179.9,
                 heading: 70.0,
@@ -150,6 +154,7 @@ fn batch_references() -> [BatchReference; 6] {
             height: 9,
             provider: Provider::Wayback,
             cam: Cam {
+                tilt: 0.0,
                 lat: 0.0,
                 lon: -180.0,
                 heading: 180.0,
@@ -162,6 +167,7 @@ fn batch_references() -> [BatchReference; 6] {
             height: 7,
             provider: Provider::Satellite,
             cam: Cam {
+                tilt: 0.0,
                 lat: -15.0,
                 lon: -50.0,
                 heading: 25.0,
@@ -174,6 +180,7 @@ fn batch_references() -> [BatchReference; 6] {
             height: 5,
             provider: Provider::Satellite,
             cam: Cam {
+                tilt: 0.0,
                 lat: 89.9,
                 lon: -179.9,
                 heading: -20.0,
@@ -289,6 +296,7 @@ fn reused_buffers_overwrite_all_pixels_and_preserve_allocation() {
 fn celestial_backdrop_changes_only_sky_and_preserves_tile_priorities() {
     let (width, height) = (65, 49);
     let cam = Cam {
+        tilt: 0.0,
         lat: 40.0,
         lon: -100.0,
         heading: 20.0,

@@ -234,7 +234,7 @@ jobs:
           cpu: 4
           mem: 12288
           prepare: |
-            pkg install -y curl git pkgconf python312 gtk3 libudev-devd libinotify libxkbcommon wayland libX11 libXcursor libXrandr libXi libxcb mesa-libs vulkan-loader
+            pkg install -y cmake curl git pkgconf python312 gtk3 libudev-devd libinotify libxkbcommon wayland libX11 libXcursor libXrandr libXi libxcb mesa-libs vulkan-loader
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.95.0
           run: |
             set -eu

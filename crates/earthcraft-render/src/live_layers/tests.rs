@@ -4,6 +4,7 @@ use std::{sync::mpsc, time::Duration};
 
 pub(super) fn input(model: EarthModel) -> LiveInput {
     let camera = Cam {
+        tilt: 0.0,
         lat: 0.0,
         lon: 0.0,
         heading: 0.0,
@@ -147,6 +148,7 @@ fn orbital_updates_reuse_roads_and_project_only_current_valid_subpoints() {
     };
     let (lat, lon) = orbit.ground_position(request.unix_secs).unwrap();
     request.view.basis = Cam {
+        tilt: 0.0,
         lat,
         lon,
         alt: 1000.0,
