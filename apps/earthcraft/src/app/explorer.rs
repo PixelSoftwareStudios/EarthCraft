@@ -72,17 +72,6 @@ fn windows_url_command(url: &str) -> Command {
     command
 }
 
-#[cfg(test)]
-mod url_tests {
-    #[test]
-    fn windows_url_preserves_query_separators_as_one_data_argument() {
-        let url = "https://www.openstreetmap.org/?mlat=51.5&mlon=-0.1#map=12/51.5/-0.1";
-        let command = super::windows_url_command(url);
-        assert_eq!(command.get_program(), "explorer.exe");
-        assert_eq!(command.get_args().collect::<Vec<_>>(), [url]);
-    }
-}
-
 #[cfg(target_os = "windows")]
 const SPEECH_TEXT_VAR: &str = "EARTHCRAFT_SPEECH_TEXT";
 
@@ -317,5 +306,16 @@ mod tests {
                 Some(std::ffi::OsStr::new(text))
             )]
         );
+    }
+}
+
+#[cfg(test)]
+mod url_tests {
+    #[test]
+    fn windows_url_preserves_query_separators_as_one_data_argument() {
+        let url = "https://www.openstreetmap.org/?mlat=51.5&mlon=-0.1#map=12/51.5/-0.1";
+        let command = super::windows_url_command(url);
+        assert_eq!(command.get_program(), "explorer.exe");
+        assert_eq!(command.get_args().collect::<Vec<_>>(), [url]);
     }
 }
