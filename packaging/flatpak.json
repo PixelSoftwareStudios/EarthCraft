@@ -9,7 +9,7 @@
   "finish-args": ["--share=network", "--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--device=dri", "--device=input", "--filesystem=host", "--env=EARTHCRAFT_UPDATE_MODE=manual"],
   "build-options": {
     "append-path": "/usr/lib/sdk/rust-stable/bin",
-    "env": {"CARGO_HOME": "/run/build/earthcraft/cargo"}
+    "env": {"CARGO_HOME": "/run/build/earthcraft/cargo", "CARGO_TARGET_DIR": "/run/ccache/cargo-target"}
   },
   "modules": [{
     "name": "earthcraft",

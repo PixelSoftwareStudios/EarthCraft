@@ -243,7 +243,9 @@ class NativePackagingTests(unittest.TestCase):
                 def flatpak(command, **options):
                     commands.append(command)
                     if command[:5] == ["dbus-run-session", "--", "flatpak", "run", "org.flatpak.Builder"]:
-                        self.assertIn("--system", command)
+                        self.assertIn("--user", command)
+                        self.assertIn("--ccache", command)
+                        self.assertEqual(options["env"]["GSETTINGS_BACKEND"], "memory")
                         self.assertIn(f"--arch={architecture}", command)
                         self.assertIn(f"--state-dir={root / 'flatpak-state'}", command)
                         manifest = json.loads(Path(command[-1]).read_text())
