@@ -304,3 +304,49 @@ fn render_and_prepare_panics_wake_the_ui_and_allow_the_next_frame() {
         assert!(worker.take_completed(1).is_some());
     }
 }
+
+#[test]
+fn presentation_filtered_buffers_are_reused_and_obsolete_frames_skip_preparation() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let prepared = Arc::new(AtomicUsize::new(0));
+    let preparations = prepared.clone();
+    let (started, starts) = mpsc::channel();
+    let (release, releases) = mpsc::channel();
+    let (wake, wakes) = mpsc::channel();
+    let worker = RenderWorker::with_prepare(
+        move |_, mut buffer| {
+            buffer.resize(64 * 48 * 4, 0);
+            started.send(buffer.as_ptr() as usize).unwrap();
+            releases.recv_timeout(TEST_TIMEOUT).unwrap();
+            crate::RenderedView {
+                pixels: buffer,
+                waiting: vec![],
+                requests: vec![],
+            }
+        },
+        move || {
+            let _ = wake.send(());
+        },
+        |_| {},
+        move |_, _| {
+            preparations.fetch_add(1, Ordering::Relaxed);
+        },
+    )
+    .unwrap();
+    worker.submit(request(0.0, 1));
+    let pointer = starts.recv_timeout(TEST_TIMEOUT).unwrap();
+    worker.submit(request(1.0, 2));
+    release.send(()).unwrap();
+    wakes.recv_timeout(TEST_TIMEOUT).unwrap();
+    assert_eq!(starts.recv_timeout(TEST_TIMEOUT).unwrap(), pointer);
+    assert_eq!(prepared.load(Ordering::Relaxed), 0);
+    release.send(()).unwrap();
+    wakes.recv_timeout(TEST_TIMEOUT).unwrap();
+    assert_eq!(prepared.load(Ordering::Relaxed), 1);
+    assert!(worker.take_completed(3).is_none());
+    worker.submit(request(2.0, 3));
+    assert_eq!(starts.recv_timeout(TEST_TIMEOUT).unwrap(), pointer);
+    release.send(()).unwrap();
+    wakes.recv_timeout(TEST_TIMEOUT).unwrap();
+    assert!(worker.take_completed(3).is_some());
+}

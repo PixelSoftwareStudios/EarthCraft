@@ -108,11 +108,27 @@ impl<T: Send + 'static> RenderWorker<T> {
                     // Rasterization holds no mailbox lock. Admission is synchronized below.
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         let frame = render(&request, buffer);
+                        {
+                            let mut mailbox = worker.mailbox.lock().unwrap();
+                            if mailbox.stopped
+                                || mailbox.pending.as_ref().is_some_and(|next| {
+                                    next.request.presentation != request.presentation
+                                })
+                            {
+                                mailbox.active = false;
+                                mailbox.spare = Some(frame.pixels);
+                                return None;
+                            }
+                        }
                         let prepared = prepare(&request, &frame.pixels);
-                        (frame, prepared)
+                        Some((frame, prepared))
                     }));
                     let (frame, prepared) = match result {
-                        Ok(result) => result,
+                        Ok(Some(result)) => result,
+                        Ok(None) => {
+                            repaint();
+                            continue;
+                        }
                         Err(payload) => {
                             let reason = payload
                                 .downcast_ref::<String>()
@@ -178,13 +194,14 @@ impl<T: Send + 'static> RenderWorker<T> {
     }
 
     pub fn take_completed(&self, presentation: u64) -> Option<RenderedFrame<T>> {
-        self.shared
-            .mailbox
-            .lock()
-            .unwrap()
-            .completed
-            .take()
-            .filter(|frame| frame.request.presentation == presentation)
+        let mut mailbox = self.shared.mailbox.lock().unwrap();
+        let frame = mailbox.completed.take()?;
+        if frame.request.presentation == presentation {
+            Some(frame)
+        } else {
+            mailbox.spare = Some(frame.pixels);
+            None
+        }
     }
 
     /// Latest worker failure; the last displayed frame remains usable.
