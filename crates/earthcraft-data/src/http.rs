@@ -178,7 +178,8 @@ mod tests {
         let job = tokio::spawn(async move {
             let (mut socket, _) = listener.accept().await.unwrap();
             let mut request = [0; 2048];
-            socket.read(&mut request).await.unwrap();
+            let received = socket.read(&mut request).await.unwrap();
+            assert!(received > 0);
             socket.write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n4\r\nfour\r\n1\r\n!\r\n0\r\n\r\n").await.unwrap();
         });
         assert!(
