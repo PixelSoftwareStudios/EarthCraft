@@ -129,19 +129,7 @@ impl Controllers {
                 }
                 Ok(mut devices) => {
                     self.error = None;
-                    // Migrate a unique legacy model profile instead of discarding custom bindings.
-                    if !prefs.selected.is_empty()
-                        && !devices.iter().any(|device| device.key == prefs.selected)
-                        && let Some(device) = devices
-                            .iter()
-                            .find(|device| prefs.selected.contains(&device.legacy_suffix))
-                    {
-                        if let Some(profile) = prefs.profiles.get(&prefs.selected).cloned() {
-                            prefs.profiles.entry(device.key.clone()).or_insert(profile);
-                        }
-                        prefs.selected = device.key.clone();
-                        self.suspended = true;
-                    }
+                    migrate_profiles(prefs, &devices);
                     if prefs.selected.is_empty()
                         && let Some(device) = devices.first()
                     {
@@ -232,6 +220,32 @@ impl Controllers {
         (motion, actions)
     }
 }
+fn migrate_profiles(prefs: &mut ControllerPreferences, devices: &[Device]) {
+    for device in devices {
+        let candidates: Vec<_> = prefs
+            .profiles
+            .keys()
+            .filter(|key| !key.starts_with("sdl-") && key.contains(&device.legacy_suffix))
+            .cloned()
+            .collect();
+        let source = candidates
+            .iter()
+            .find(|key| **key == prefs.selected)
+            .or_else(|| (candidates.len() == 1).then(|| &candidates[0]));
+        if let Some(source) = source {
+            // Rename instead of duplicating: migration must not consume the bounded profile budget.
+            if !prefs.profiles.contains_key(&device.key)
+                && let Some(profile) = prefs.profiles.remove(source)
+            {
+                prefs.profiles.insert(device.key.clone(), profile);
+            }
+        }
+        if !prefs.selected.starts_with("sdl-") && prefs.selected.contains(&device.legacy_suffix) {
+            prefs.selected = device.key.clone();
+        }
+    }
+}
+
 fn neutral(
     state: &ControllerState,
     profile: &earthcraft_core::controller::ControllerProfile,
@@ -313,6 +327,34 @@ impl App {
 mod tests {
     use super::*;
     use earthcraft_core::controller::ControllerProfile;
+    #[test]
+    fn migrating_connected_models_keeps_profiles_without_duplicating_the_budget() {
+        let mut prefs = ControllerPreferences::default();
+        let mut devices = Vec::new();
+        for (id, product) in [(1, "2009"), (2, "1234")] {
+            let old = format!("uuid-057e-{product}-Pro Controller");
+            let mut profile = ControllerProfile::default();
+            profile.axes[0].sensitivity = f64::from(id);
+            prefs.profiles.insert(old.clone(), profile);
+            if id == 1 {
+                prefs.selected = old;
+            }
+            devices.push(Device {
+                id,
+                key: format!("sdl-model-{product}"),
+                legacy_suffix: format!("-057e-{product}-"),
+                name: "Pro Controller".into(),
+                state: ControllerState::default(),
+            });
+        }
+        migrate_profiles(&mut prefs, &devices);
+        assert_eq!(prefs.profiles.len(), 2);
+        assert_eq!(prefs.selected, "sdl-model-2009");
+        assert_eq!(prefs.profile("sdl-model-2009").axes[0].sensitivity, 1.0);
+        assert_eq!(prefs.profile("sdl-model-1234").axes[0].sensitivity, 2.0);
+        migrate_profiles(&mut prefs, &devices);
+        assert_eq!(prefs.profiles.len(), 2);
+    }
     #[test]
     fn neutral_gate_ignores_unbound_axes_and_buttons_but_requires_bound_controls_released() {
         let mut state = ControllerState::default();
