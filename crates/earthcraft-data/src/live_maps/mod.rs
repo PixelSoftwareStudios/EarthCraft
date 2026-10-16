@@ -14,6 +14,7 @@ const RETRY_INTERVAL: Duration = Duration::from_secs(60);
 struct RadarFrame {
     image: RgbaImage,
     time: i64,
+    failed_tiles: usize,
 }
 
 #[derive(Default)]
@@ -27,6 +28,7 @@ pub struct LiveMaps {
     cloud_error: Option<String>,
     radar_error: Option<String>,
     radar_frame_time: Option<i64>,
+    radar_failed_tiles: usize,
     generation: u64,
 }
 impl LiveMaps {
@@ -62,6 +64,7 @@ impl LiveMaps {
             match rx.try_recv() {
                 Ok(Ok(frame)) => {
                     self.radar_frame_time = Some(frame.time);
+                    self.radar_failed_tiles = frame.failed_tiles;
                     self.radar = Some(frame.image);
                     self.radar_error = None;
                     self.radar_rx = None;
@@ -172,6 +175,11 @@ impl LiveMaps {
                         ],
                     ),
                 );
+            } else if self.radar.is_some() && self.radar_failed_tiles > 0 {
+                lines.push(Lang::En.format(
+                    "live-radar-partial-error",
+                    &[("count", self.radar_failed_tiles.into())],
+                ));
             } else if self.radar.is_some() {
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -208,5 +216,19 @@ mod tests {
         );
         assert!(status.contains("showing cached image"));
         assert!(maps.status(false, false, Lang::PtBr).is_empty());
+    }
+    #[test]
+    fn partial_radar_status_is_visible_in_both_languages() {
+        let live = LiveMaps {
+            radar: Some(RgbaImage::new(1, 1)),
+            radar_failed_tiles: 3,
+            ..Default::default()
+        };
+        for lang in Lang::ALL {
+            assert_eq!(
+                live.status(false, true, lang),
+                "Radar incomplete: 3 tiles failed to load"
+            );
+        }
     }
 }

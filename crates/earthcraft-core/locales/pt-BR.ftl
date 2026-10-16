@@ -927,3 +927,7 @@ live-radar-error =
     }
 
 settings-cache-persistence-error = Cache em disco indisponível: { $error }
+
+traffic-partial-error = Tráfego incompleto: falha ao carregar { $count } blocos
+
+live-radar-partial-error = Radar incompleto: falha ao carregar { $count } blocos

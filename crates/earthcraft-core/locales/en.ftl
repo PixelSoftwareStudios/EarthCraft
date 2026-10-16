@@ -927,3 +927,7 @@ live-radar-error =
     }
 
 settings-cache-persistence-error = Disk cache unavailable: { $error }
+
+traffic-partial-error = Traffic incomplete: { $count } tiles failed to load
+
+live-radar-partial-error = Radar incomplete: { $count } tiles failed to load
