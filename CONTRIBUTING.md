@@ -6,7 +6,8 @@ so reviewers can distinguish behavior changes from file organization.
 
 ## Development
 
-Install Rust 1.95 or newer through rustup. The locked dependency graph includes
+Install Rust 1.95 or newer through rustup. Native builds also require CMake and a C/C++ compiler
+for the statically linked SDL3 gamepad/HID backend. Eframe owns all windows and presentation. The locked dependency graph includes
 eframe/egui 0.36, which require Rust 1.95.
 The workspace uses Edition 2024 and declares Rust 1.95; CI checks stable on
 Ubuntu. Stable is suitable for day-to-day development; do not use APIs newer than
@@ -83,6 +84,12 @@ file dialogs, or packaging. Run the following manual checks for affected areas:
 - Launch from the root and verify the icon, initial view and panels.
 - Orbit, zoom under the cursor, rotate with right-drag/Shift, use arrow keys,
   compass/north reset, navigation widgets, double-click and fly-to.
+  Tilt with middle-drag, the Globe slider and right-stick Y; check picks, overlays,
+  horizon/space and cursor-anchored zoom for both Earth models. R restores north and
+  nadir without moving the camera; N changes only heading. Confirm text focus blocks R.
+  With a USB Switch Pro Controller, check all four stick axes, released triggers at zero,
+  stable monitor rows, tilt remapping, held controls on reconnect, modal suspension and unplugging.
+  Check startup-view tilt and migration of an existing customized five-axis profile.
   Hold each pan, rotation and zoom button for at least ten seconds; verify
   movement continues until release, including with slight pointer movement.
   Toggle Settings → Hide navigation controls; verify the top-right controls

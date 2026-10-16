@@ -59,7 +59,7 @@ impl App {
             ui.label(lang.format(
                 "controllers-conflict",
                 &[
-                    ("button", format!("{:?}", BUTTONS[target]).into()),
+                    ("button", BUTTONS[target].into()),
                     (
                         "action",
                         lang.text(profile.buttons[target].label_id()).into(),
@@ -87,6 +87,7 @@ impl App {
                         "controllers-heading",
                         "controllers-zoom-out",
                         "controllers-zoom-in",
+                        "controllers-tilt",
                     ][action],
                 ));
                 ui.horizontal(|ui| {
@@ -135,7 +136,7 @@ impl App {
         for (input, logical) in profile.buttons.iter_mut().enumerate() {
             ui.push_id(("button", input), |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(format!("{:?}", BUTTONS[input]));
+                    ui.label(BUTTONS[input]);
                     egui::ComboBox::from_id_salt("action")
                         .selected_text(lang.text(logical.label_id()))
                         .show_ui(ui, |ui| {
@@ -159,21 +160,69 @@ impl App {
             .iter()
             .find(|device| device.key == key)
         {
-            for (input, value) in device.state.axes.iter().enumerate() {
-                ui.label(format!("{}: {value:+.3}", lang.text(AXIS_LABEL_IDS[input])));
-            }
-            for (input, down) in device
-                .state
-                .buttons
-                .iter()
-                .enumerate()
-                .filter(|(_, down)| **down)
-            {
-                let _ = down;
-                ui.label(format!("{:?}", BUTTONS[input]));
-            }
+            live_monitor(ui, &device.state, lang);
         } else {
             ui.label(lang.text("controllers-disconnected"));
+        }
+    }
+}
+
+fn live_monitor(
+    ui: &mut egui::Ui,
+    state: &earthcraft_core::controller::ControllerState,
+    lang: earthcraft_core::language::Lang,
+) {
+    for (input, value) in state.axes.iter().enumerate() {
+        ui.label(format!("{}: {value:+.3}", lang.text(AXIS_LABEL_IDS[input])));
+    }
+    egui::Grid::new("controller-live-buttons")
+        .num_columns(2)
+        .show(ui, |ui| {
+            for (input, label) in BUTTONS.iter().enumerate() {
+                ui.label(*label);
+                ui.label(lang.text(if state.buttons[input] {
+                    "controllers-pressed"
+                } else {
+                    "controllers-released"
+                }));
+                ui.end_row();
+            }
+        });
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn live_monitor_keeps_its_height_when_buttons_change() {
+        for lang in earthcraft_core::language::Lang::ALL {
+            let ctx = egui::Context::default();
+            let mut heights = Vec::new();
+            for pressed in [false, true, false] {
+                let state = earthcraft_core::controller::ControllerState {
+                    buttons: [pressed; 19],
+                    ..Default::default()
+                };
+                crate::app::test_ui::run(
+                    &ctx,
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(1000.0, 1600.0),
+                        )),
+                        ..Default::default()
+                    },
+                    |ui| {
+                        let top = ui.cursor().top();
+                        live_monitor(ui, &state, lang);
+                        heights.push(ui.cursor().top() - top);
+                    },
+                );
+            }
+            assert!(
+                heights
+                    .windows(2)
+                    .all(|pair| (pair[0] - pair[1]).abs() < 1.0)
+            );
         }
     }
 }

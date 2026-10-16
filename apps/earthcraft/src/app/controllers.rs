@@ -3,34 +3,34 @@ use super::{App, menu::Action};
 use earthcraft_core::controller::{ControllerAction, ControllerMotion, ControllerState};
 use earthcraft_data::settings::controllers::ControllerPreferences;
 use eframe::egui;
-use gilrs::{Axis, Button, EventType, GamepadId, Gilrs};
+mod backend;
+use backend::Backend;
 use std::time::{Duration, Instant};
 const ACTIVE_POLL_INTERVAL: Duration = Duration::from_millis(16);
 const HOTPLUG_POLL_INTERVAL: Duration = Duration::from_millis(250);
-const MAX_EVENTS_PER_FRAME: usize = 512;
 const BIND_TIMEOUT: Duration = Duration::from_secs(10);
 const BIND_AXIS_THRESHOLD: f64 = 0.75;
 const NEUTRAL_THRESHOLD: f64 = 0.2;
-pub(super) const BUTTONS: [Button; 19] = [
-    Button::South,
-    Button::East,
-    Button::North,
-    Button::West,
-    Button::LeftTrigger,
-    Button::RightTrigger,
-    Button::LeftTrigger2,
-    Button::RightTrigger2,
-    Button::Select,
-    Button::Start,
-    Button::LeftThumb,
-    Button::RightThumb,
-    Button::DPadUp,
-    Button::DPadDown,
-    Button::DPadLeft,
-    Button::DPadRight,
-    Button::Mode,
-    Button::C,
-    Button::Z,
+pub(super) const BUTTONS: [&str; 19] = [
+    "South",
+    "East",
+    "North",
+    "West",
+    "LeftTrigger",
+    "RightTrigger",
+    "LeftTrigger2",
+    "RightTrigger2",
+    "Select",
+    "Start",
+    "LeftThumb",
+    "RightThumb",
+    "DPadUp",
+    "DPadDown",
+    "DPadLeft",
+    "DPadRight",
+    "Mode",
+    "C",
+    "Z",
 ];
 pub(super) const AXIS_LABEL_IDS: [&str; 6] = [
     "controllers-left-x",
@@ -41,7 +41,8 @@ pub(super) const AXIS_LABEL_IDS: [&str; 6] = [
     "controllers-right-trigger",
 ];
 pub(super) struct Device {
-    pub(super) id: GamepadId,
+    pub(super) id: u32,
+    legacy_suffix: String,
     pub(super) key: String,
     pub(super) name: String,
     pub(super) state: ControllerState,
@@ -53,7 +54,7 @@ pub(super) struct BindingCapture {
     armed: [bool; 6],
 }
 pub(super) struct Controllers {
-    backend: Option<Gilrs>,
+    backend: Option<Backend>,
     pub(super) devices: Vec<Device>,
     pub(super) error: Option<String>,
     pub(super) capture: Option<BindingCapture>,
@@ -63,22 +64,14 @@ pub(super) struct Controllers {
 }
 impl Controllers {
     pub(super) fn new() -> Self {
-        let (backend, error) = match Gilrs::new() {
+        let (backend, error) = match Backend::new() {
             Ok(backend) => (Some(backend), None),
             Err(error) => (
                 None,
                 Some(format!("Controller initialization failed: {error}")),
             ),
         };
-        let devices = backend
-            .as_ref()
-            .map(|backend| {
-                backend
-                    .gamepads()
-                    .map(|(id, gamepad)| device(id, gamepad))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let devices = Vec::new();
         Self {
             backend,
             devices,
@@ -128,65 +121,46 @@ impl Controllers {
             self.capture = None;
         }
         if let Some(backend) = &mut self.backend {
-            for _ in 0..MAX_EVENTS_PER_FRAME {
-                let Some(event) = backend.next_event() else {
-                    break;
-                };
-                match event.event {
-                    EventType::Connected => {
-                        self.devices.retain(|device| device.id != event.id);
-                        self.devices
-                            .push(device(event.id, backend.gamepad(event.id)));
-                        self.suspended = true;
-                    }
-                    EventType::Disconnected => {
-                        if let Some(device) =
-                            self.devices.iter_mut().find(|device| device.id == event.id)
-                        {
-                            device.state.release();
-                        }
-                        self.devices.retain(|device| device.id != event.id);
-                        self.capture = None;
-                        self.suspended = true;
-                    }
-                    _ => {}
+            match backend.poll() {
+                Err(error) => {
+                    self.error = Some(format!("Controller polling failed: {error}"));
+                    self.devices.clear();
+                    self.suspended = true;
                 }
-                let Some(device) = self.devices.iter_mut().find(|device| device.id == event.id)
-                else {
-                    continue;
-                };
-                let selected = device.key == prefs.selected;
-                match event.event {
-                    EventType::AxisChanged(axis, value, _) => {
-                        if let Some(input) = [
-                            Axis::LeftStickX,
-                            Axis::LeftStickY,
-                            Axis::RightStickX,
-                            Axis::RightStickY,
-                        ]
-                        .iter()
-                        .position(|candidate| *candidate == axis)
-                        {
-                            device.state.axes[input] = f64::from(value);
+                Ok(mut devices) => {
+                    self.error = None;
+                    // Migrate a unique legacy model profile instead of discarding custom bindings.
+                    if !prefs.selected.is_empty()
+                        && !devices.iter().any(|device| device.key == prefs.selected)
+                        && let Some(device) = devices
+                            .iter()
+                            .find(|device| prefs.selected.contains(&device.legacy_suffix))
+                    {
+                        if let Some(profile) = prefs.profiles.get(&prefs.selected).cloned() {
+                            prefs.profiles.entry(device.key.clone()).or_insert(profile);
                         }
+                        prefs.selected = device.key.clone();
+                        self.suspended = true;
                     }
-                    EventType::ButtonChanged(button, value, _) => {
-                        if button == Button::LeftTrigger2 {
-                            device.state.axes[4] = f64::from(value);
-                        }
-                        if button == Button::RightTrigger2 {
-                            device.state.axes[5] = f64::from(value);
-                        }
+                    if prefs.selected.is_empty()
+                        && let Some(device) = devices.first()
+                    {
+                        prefs.selected = device.key.clone();
                     }
-                    EventType::ButtonPressed(button, _) | EventType::ButtonReleased(button, _) => {
-                        let down = matches!(event.event, EventType::ButtonPressed(..));
-                        if let Some(input) =
-                            BUTTONS.iter().position(|candidate| *candidate == button)
-                        {
-                            let profile = prefs.profile(&device.key);
-                            let action = device.state.button(input, down, &profile);
+                    for device in &mut devices {
+                        let selected = device.key == prefs.selected;
+                        let old = self.devices.iter().find(|old| old.id == device.id);
+                        if selected && old.is_none() {
+                            self.suspended = true;
+                        }
+                        let profile = prefs.profile(&device.key);
+                        let mut previous = old.map(|old| old.state.clone()).unwrap_or_default();
+                        for input in 0..BUTTONS.len() {
+                            let down = device.state.buttons[input];
+                            let rising = down && !previous.buttons[input];
+                            let action = previous.button(input, down, &profile);
                             if selected
-                                && down
+                                && rising
                                 && self.capture.as_ref().is_some_and(|capture| !capture.axis)
                             {
                                 let capture = self.capture.take().unwrap();
@@ -205,23 +179,27 @@ impl Controllers {
                                 actions.push(action);
                             }
                         }
-                    }
-                    _ => {}
-                }
-                if selected
-                    && let Some(capture) = &mut self.capture
-                    && capture.axis
-                {
-                    for (input, value) in device.state.axes.iter().enumerate() {
-                        capture.armed[input] |= value.abs() < NEUTRAL_THRESHOLD;
-                        if capture.armed[input] && value.abs() >= BIND_AXIS_THRESHOLD {
-                            prefs.profiles.entry(device.key.clone()).or_default().axes
-                                [capture.action]
-                                .input = Some(input);
-                            self.capture = None;
-                            break;
+                        if selected
+                            && let Some(capture) = &mut self.capture
+                            && capture.axis
+                        {
+                            for (input, value) in device.state.axes.iter().enumerate() {
+                                capture.armed[input] |= value.abs() < NEUTRAL_THRESHOLD;
+                                if capture.armed[input] && value.abs() >= BIND_AXIS_THRESHOLD {
+                                    prefs.profiles.entry(device.key.clone()).or_default().axes
+                                        [capture.action]
+                                        .input = Some(input);
+                                    self.capture = None;
+                                    break;
+                                }
+                            }
                         }
                     }
+                    if !devices.iter().any(|device| device.key == prefs.selected) {
+                        self.capture = None;
+                        self.suspended = true;
+                    }
+                    self.devices = devices;
                 }
             }
         }
@@ -242,12 +220,7 @@ impl Controllers {
             && prefs.enabled
             && self.capture.is_none()
             && self.conflict.is_none()
-            && device
-                .state
-                .axes
-                .iter()
-                .all(|axis| axis.abs() < NEUTRAL_THRESHOLD)
-            && device.state.buttons.iter().all(|down| !down)
+            && neutral(&device.state, &prefs.profile(&device.key))
         {
             self.suspended = false;
         }
@@ -259,26 +232,24 @@ impl Controllers {
         (motion, actions)
     }
 }
-fn device(id: GamepadId, gamepad: gilrs::Gamepad<'_>) -> Device {
-    // gilrs UUID identifies a model, not a unique physical serial number.
-    let uuid: String = gamepad
-        .uuid()
+fn neutral(
+    state: &ControllerState,
+    profile: &earthcraft_core::controller::ControllerProfile,
+) -> bool {
+    profile.axes.iter().all(|binding| {
+        binding.input.is_none_or(|input| {
+            state
+                .axes
+                .get(input)
+                .is_none_or(|value| value.abs() < NEUTRAL_THRESHOLD.max(binding.deadzone))
+        })
+    }) && state
+        .buttons
         .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
-    let key = format!(
-        "{uuid}-{:04x}-{:04x}-{}",
-        gamepad.vendor_id().unwrap_or_default(),
-        gamepad.product_id().unwrap_or_default(),
-        gamepad.name()
-    );
-    Device {
-        id,
-        key,
-        name: gamepad.name().into(),
-        state: ControllerState::default(),
-    }
+        .zip(profile.buttons)
+        .all(|(down, action)| !down || action == ControllerAction::None)
 }
+
 impl App {
     pub(super) fn controller_input(&mut self, ctx: &egui::Context, height_points: f32) -> bool {
         if ctx.current_pass_index() != 0 {
@@ -311,6 +282,11 @@ impl App {
                     self.ruler_drag = None;
                     None
                 }
+                ControllerAction::Reset => {
+                    self.fly = None;
+                    self.cam.reset_view();
+                    None
+                }
                 ControllerAction::None => None,
             };
             if let Some(menu) = menu {
@@ -330,5 +306,25 @@ impl App {
             return true;
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use earthcraft_core::controller::ControllerProfile;
+    #[test]
+    fn neutral_gate_ignores_unbound_axes_and_buttons_but_requires_bound_controls_released() {
+        let mut state = ControllerState::default();
+        let mut profile = ControllerProfile::default();
+        assert!(neutral(&state, &profile));
+        state.axes[3] = 1.0;
+        assert!(!neutral(&state, &profile));
+        profile.axes[5].input = None;
+        assert!(neutral(&state, &profile));
+        state.buttons[18] = true;
+        assert!(neutral(&state, &profile));
+        state.buttons[0] = true;
+        assert!(!neutral(&state, &profile));
     }
 }

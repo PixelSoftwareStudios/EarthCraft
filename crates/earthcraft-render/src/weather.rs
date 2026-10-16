@@ -100,6 +100,7 @@ mod projection_tests {
     fn cloud_raster_preserves_opacity_and_leaves_space_clear() {
         let rect = Rect::from_min_size(Pos2::new(30.0, 50.0), Vec2::splat(800.0));
         let basis = Cam {
+            tilt: 0.0,
             lat: 0.0,
             lon: 0.0,
             alt: 14_000.0,

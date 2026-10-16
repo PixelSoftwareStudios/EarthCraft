@@ -559,7 +559,7 @@ settings-startup-help = Posição, rumo e altitude salvos serão usados na próx
 
 settings-category-controllers = Controles
 controllers-enabled = Ativar controles
-controllers-help = Navegação Explorar: analógico esquerdo move, eixo X direito gira e gatilhos controlam o zoom. Solte os controles após fechar diálogos ou reconectar.
+controllers-help = Navegação Explorar: analógico esquerdo move, eixo X direito gira, eixo Y inclina e gatilhos controlam o zoom. Solte os controles após fechar diálogos ou reconectar.
 controllers-disconnected = Dispositivo selecionado desconectado
 controllers-action-none = Sem vínculo
 controllers-action-cancel = Cancelar movimento da câmera
@@ -596,3 +596,15 @@ sky-short-credit = Céu: NASA SVS · Gaia DR2 (ESA/Gaia/DPAC)
 sky-combined-credit = { $map }
     { $sky }
 sky-software-credits = Licenças do software de transformação celeste
+
+controllers-tilt = Inclinação da câmera
+controllers-pressed = Pressionado
+controllers-released = Solto
+navigation-reset-view-action = Redefinir norte e inclinação
+
+navigation-tilt-label = Inclinação da câmera
+navigation-tilt-help = Arraste com o botão central do mouse ou mova o analógico direito verticalmente. A inclinação olha em direção ao horizonte a partir da posição atual da câmera.
+navigation-reset-view-help = R redefine norte e inclinação. N redefine apenas o norte.
+
+controls-tilt-help-text = • Arrastar com botão central / eixo Y direito: inclinar a câmera da Terra
+    • R: redefinir norte e inclinação

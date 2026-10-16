@@ -382,7 +382,8 @@ Camera math remains in core. See [settings](features/SETTINGS.md).
 ## Controllers
 
 Core owns normalized Explore bindings, response/deadzone policy, button edges and
-camera steps. Data persists bounded per-model profiles. The app's gilrs adapter
+camera steps, including bounded tilt from nadir with cached double-precision view transforms.
+Data persists bounded per-model profiles and tolerantly loads pre-tilt startup cameras. The app's SDL3 gamepad adapter
 polls hotplug/input, arbitrates focus and dispatches tool actions through menus;
 its settings module owns remapping and the live monitor. See
 [controllers](features/CONTROLLERS.md) for device/platform limits.

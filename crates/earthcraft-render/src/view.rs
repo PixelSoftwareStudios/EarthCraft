@@ -52,6 +52,7 @@ impl RasterView {
                 self.camera.lat.to_bits(),
                 self.camera.lon.to_bits(),
                 self.camera.heading.to_bits(),
+                self.camera.tilt.to_bits(),
                 self.camera.alt.to_bits(),
                 self.width,
                 self.height,
@@ -95,6 +96,7 @@ mod tests {
     fn sky_changes_invalidate_presentation_even_without_sunlight() {
         let mut view = RasterView {
             camera: Cam {
+                tilt: 0.0,
                 lat: 0.0,
                 lon: 0.0,
                 alt: 14000.0,
@@ -126,6 +128,7 @@ mod tests {
         let mut view = RasterView {
             model: earthcraft_core::earth_model::EarthModel::PerfectSphere,
             camera: Cam {
+                tilt: 0.0,
                 lat: 0.0,
                 lon: 0.0,
                 alt: 14_000.0,
@@ -147,6 +150,10 @@ mod tests {
         assert_ne!(view.keys(120.0).presentation, original.presentation);
         assert_ne!(view.keys(120.0).state, original.state);
         view.model = earthcraft_core::earth_model::EarthModel::PerfectSphere;
+        view.camera.tilt = 45.0;
+        assert_ne!(view.keys(120.0).state, original.state);
+        assert_eq!(view.keys(120.0).presentation, original.presentation);
+        view.camera.tilt = 0.0;
         view.camera.lon = 90.0;
         let moved = view.keys(120.0);
         assert_ne!(moved.state, original.state);

@@ -48,6 +48,7 @@ fn aircraft_geometry_is_prepared_for_the_raster_camera_before_publication() {
 
 fn request(longitude: f64, presentation: u64) -> RenderRequest {
     let cam = Cam {
+        tilt: 0.0,
         lat: -15.0,
         lon: longitude,
         heading: 25.0,
