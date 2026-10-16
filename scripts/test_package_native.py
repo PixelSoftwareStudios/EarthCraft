@@ -173,6 +173,8 @@ class NativePackagingTests(unittest.TestCase):
         flatpak = json.loads((release.ROOT / "packaging/flatpak.json").read_text())
         self.assertEqual(flatpak["app-id"], tools.APP_ID)
         self.assertIn("--env=EARTHCRAFT_UPDATE_MODE=manual", flatpak["finish-args"])
+        self.assertEqual(flatpak["build-options"]["env"]["CARGO_TARGET_DIR"], "/run/ccache/cargo-target")
+        self.assertIn('$CARGO_TARGET_DIR/release/earthcraft', flatpak["modules"][0]["build-commands"][1])
         command = flatpak["modules"][0]["build-commands"][0]
         for argument in ("--locked", "--offline", "--no-default-features"):
             self.assertIn(argument, command)
