@@ -1,11 +1,16 @@
-//! Link the Apple availability helpers referenced by statically compiled SDL.
+//! Platform runtimes required by the statically compiled SDL input backend.
 use std::{path::Path, process::Command};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-env-changed=DEVELOPER_DIR");
     println!("cargo::rerun-if-env-changed=SDKROOT");
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS")?;
+    if target_os == "freebsd" {
+        // SDL's BSD joystick parser uses the base-system usbhid library.
+        println!("cargo::rustc-link-lib=usbhid");
+    }
+    if target_os != "macos" {
         return Ok(());
     }
     // Rust's final link does not automatically include Clang's availability
