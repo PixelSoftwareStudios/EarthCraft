@@ -198,6 +198,7 @@ mod parallel_tests {
     fn parallel_rows_match_single_thread_pixels_and_sizing_is_bounded() {
         let rect = Rect::from_min_size(Pos2::ZERO, emath::vec2(2000.0, 1000.0));
         let basis = earthcraft_core::camera::Cam {
+            tilt: 0.0,
             lat: 20.0,
             lon: 30.0,
             heading: 45.0,

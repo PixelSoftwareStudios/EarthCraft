@@ -126,6 +126,9 @@ impl<T: Send + 'static> RenderWorker<T> {
                     let (frame, prepared) = match result {
                         Ok(Some(result)) => result,
                         Ok(None) => {
+                            if worker.mailbox.lock().unwrap().stopped {
+                                return;
+                            }
                             repaint();
                             continue;
                         }
