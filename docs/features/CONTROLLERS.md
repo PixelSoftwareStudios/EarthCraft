@@ -62,5 +62,26 @@ Tilt ranges from nadir (0°) to 85° toward the horizon without moving the camer
 Middle-drag or the Globe slider also adjusts tilt. R resets heading and tilt; N only
 resets heading. Fly-to smoothly returns to nadir. Saved startup views retain tilt.
 Legacy five-action profiles retain bindings and gain right-stick-Y tilt.
-The live monitor uses fixed button rows. Physical USB Pro Controller mapping
-and interactive navigation still require hardware review.
+The live monitor uses fixed button rows.
+
+On macOS, Nintendo Pro Controller full reports (0x30/0x31, model
+057e:2009) need an additional decoder because gilrs' standard HID path does not
+decode their vendor-defined payload. A nonexclusive, background hidapi reader
+feeds normalized events into the same gilrs queue. Selection, profiles, remapping,
+focus checks and camera motion still use the existing gilrs adapter. Standard HID
+reports and other controller models keep their native gilrs input path.
+The reader requests factory/user stick calibration through read-only SPI commands;
+invalid/unavailable calibration uses the full 12-bit range. It does not change
+report mode, flash contents or enable rumble. Axes coalesce, button edges have a
+bounded queue, and overflow/disconnect/timeouts release input and require neutral
+before navigation resumes. Errors appear in Settings. This compatibility path
+supports one connected Pro Controller at a time because gilrs does not expose the
+HID path needed to associate multiple identical devices safely.
+
+The physical-device check verified all four stick axes, a face button, neutral
+release and navigation motion through the production adapter on macOS. Interactive
+globe behavior and other platforms still require the desktop smoke checklist.
+To repeat the hardware check on macOS, connect a Pro Controller and run
+`cargo test -p earthcraft --locked nintendo_hardware_input -- --ignored --nocapture`.
+Center the sticks first, move both fully in every direction, hold a face button
+briefly, then release everything. The test exits on success or after ten minutes.

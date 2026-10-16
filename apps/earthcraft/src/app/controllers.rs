@@ -5,6 +5,8 @@ use earthcraft_data::settings::controllers::ControllerPreferences;
 use eframe::egui;
 use gilrs::{Axis, Button, EventType, GamepadId, Gilrs};
 use std::time::{Duration, Instant};
+#[cfg(target_os = "macos")]
+mod nintendo;
 const ACTIVE_POLL_INTERVAL: Duration = Duration::from_millis(16);
 const HOTPLUG_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const MAX_EVENTS_PER_FRAME: usize = 512;
@@ -54,6 +56,8 @@ pub(super) struct BindingCapture {
 }
 pub(super) struct Controllers {
     backend: Option<Gilrs>,
+    #[cfg(target_os = "macos")]
+    nintendo: Option<Result<nintendo::Nintendo, String>>,
     pub(super) devices: Vec<Device>,
     pub(super) error: Option<String>,
     pub(super) capture: Option<BindingCapture>,
@@ -81,6 +85,8 @@ impl Controllers {
             .unwrap_or_default();
         Self {
             backend,
+            #[cfg(target_os = "macos")]
+            nintendo: None,
             devices,
             error,
             capture: None,
@@ -128,6 +134,26 @@ impl Controllers {
             self.capture = None;
         }
         if let Some(backend) = &mut self.backend {
+            #[cfg(target_os = "macos")]
+            {
+                if self.nintendo.is_none()
+                    && backend
+                        .gamepads()
+                        .any(|(_, gamepad)| nintendo::Nintendo::supports(&gamepad))
+                {
+                    self.nintendo = Some(nintendo::Nintendo::new(ctx));
+                }
+                if let Some(nintendo) = &mut self.nintendo {
+                    match nintendo {
+                        Ok(nintendo) => {
+                            let (reset, error) = nintendo.poll(backend);
+                            self.suspended |= reset;
+                            self.error = error;
+                        }
+                        Err(error) => self.error = Some(error.clone()),
+                    }
+                }
+            }
             for _ in 0..MAX_EVENTS_PER_FRAME {
                 let Some(event) = backend.next_event() else {
                     break;
@@ -224,6 +250,7 @@ impl Controllers {
                     }
                 }
             }
+            backend.inc();
         }
         ctx.request_repaint_after(if self.devices.is_empty() {
             HOTPLUG_POLL_INTERVAL
@@ -351,21 +378,4 @@ fn neutral(
         .all(|(down, action)| !down || action == ControllerAction::None)
 }
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use earthcraft_core::controller::ControllerProfile;
-    #[test]
-    fn neutral_gate_ignores_unbound_controls_and_requires_bound_controls_released() {
-        let mut state = ControllerState::default();
-        let mut profile = ControllerProfile::default();
-        assert!(neutral(&state, &profile));
-        state.axes[3] = 1.0;
-        assert!(!neutral(&state, &profile));
-        profile.axes[5].input = None;
-        assert!(neutral(&state, &profile));
-        state.buttons[18] = true;
-        assert!(neutral(&state, &profile));
-        state.buttons[0] = true;
-        assert!(!neutral(&state, &profile));
-    }
-}
+mod tests;

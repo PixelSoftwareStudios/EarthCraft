@@ -387,7 +387,11 @@ Core owns normalized Explore bindings, response/deadzone policy, button edges an
 camera steps, including bounded tilt from nadir with cached double-precision view transforms.
 Data persists bounded per-model profiles and tolerantly loads pre-tilt startup cameras. The app's gilrs adapter
 polls hotplug/input, arbitrates focus and dispatches tool actions through menus;
-its settings module owns remapping and the live monitor. See
+its settings module owns remapping and the live monitor. On macOS, a bounded,
+nonexclusive HID reader decodes Nintendo Pro full reports and injects normalized
+events into gilrs. Native device I/O and protocol decoding stay in the app;
+the worker coalesces axes and retains bounded button edges, with read-only stick
+calibration and neutral rearming after input loss. See
 [controllers](features/CONTROLLERS.md) for device/platform limits.
 
 ## Celestial background

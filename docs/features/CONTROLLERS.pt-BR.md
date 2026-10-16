@@ -50,4 +50,27 @@ Arraste com o botão central ou use o controle do painel Globo. R redefine norte
 inclinação; N redefine apenas orientação. Voar até um ponto retorna ao nadir.
 A vista inicial salva mantém a inclinação. Perfis antigos mantêm vínculos e
 recebem inclinação no eixo Y direito. O monitor usa linhas fixas para botões.
-O mapeamento físico do Pro Controller USB ainda exige revisão no dispositivo.
+
+No macOS, relatórios completos do Nintendo Pro Controller (0x30/0x31,
+modelo 057e:2009) precisam de um decodificador adicional: a entrada HID padrão
+do gilrs não interpreta esses dados específicos do fabricante. Um leitor hidapi
+não exclusivo, em segundo plano, envia eventos normalizados para a mesma fila
+gilrs. Seleção, perfis, vínculos, foco e movimento continuam no adaptador existente.
+Relatórios HID padrão e outros modelos mantêm a entrada nativa do gilrs.
+O leitor solicita a calibração de fábrica/usuário por comandos SPI somente de
+leitura; dados inválidos/indisponíveis usam o intervalo completo de 12 bits.
+Não altera modo de relatório, memória flash ou ativa vibração. Eixos são
+agrupados e transições de botões usam uma fila limitada. Excesso de entradas,
+desconexão ou interrupção dos relatórios libera os controles e exige retorno ao
+neutro. Erros aparecem nas Configurações. Esse caminho aceita um Pro Controller
+conectado por vez: o gilrs não expõe o caminho HID necessário para associar
+múltiplos dispositivos idênticos com segurança.
+
+O teste físico no macOS verificou quatro eixos, um botão frontal, retorno ao
+neutro e movimento de navegação pelo adaptador de produção. O globo interativo e
+outras plataformas ainda exigem a lista de verificações do aplicativo.
+Para repetir no macOS, conecte um Pro Controller e execute
+`cargo test -p earthcraft --locked nintendo_hardware_input -- --ignored --nocapture`.
+Centralize os analógicos, mova ambos completamente em todas as direções,
+segure um botão frontal brevemente e solte tudo. O teste termina ao passar
+ou após dez minutos.
