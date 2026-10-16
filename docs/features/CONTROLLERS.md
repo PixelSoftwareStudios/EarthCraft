@@ -2,8 +2,8 @@
 
 [English](CONTROLLERS.md) | [Português (Brasil)](CONTROLLERS.pt-BR.md)
 
-Settings → Controllers enables gamepads recognized by
-[SDL3](https://wiki.libsdl.org/SDL3/CategoryGamepad). Connect/disconnect without
+Settings → Controllers enables standard gamepads/joysticks recognized by
+[gilrs 0.11.2](https://docs.rs/gilrs/0.11.2/gilrs/). Connect/disconnect without
 restarting. Choose a device, adjust its Explore profile, watch normalized inputs,
 and restore that profile's defaults. Mouse/keyboard remain available.
 
@@ -34,16 +34,15 @@ Return bound axes/buttons to neutral after reconnecting, switching devices or le
 an editor to prevent accidental motion. A bounded event drain and repaint timer
 keep hotplugging available while the globe is idle.
 
-Profiles persist locally in settings.json using SDL model GUID, vendor/product
-IDs and name. Matching legacy profiles migrate by vendor/product identity. Different models retain independent profiles; identical models
+Profiles persist locally in settings.json using gilrs model UUID, vendor/product
+IDs and name. Different models retain independent profiles; identical models
 without distinct backend identities share a profile. This is not a physical
 serial-number identity. Unknown/malformed profiles fall back independently and
 numeric values are bounded. No network or executable profile content is used.
 
-Native builds statically compile only SDL3 gamepad/HID subsystems and require CMake
-and a C/C++ compiler. SDL handles Switch USB protocol initialization and calibration.
-The monitor samples all axes/buttons with fixed rows instead of showing transient events.
-Linux/FreeBSD still need OS input-device access. Snap requests the joystick interface; Flatpak requests input devices.
+Linux builds need pkg-config and libudev development files, with libudev at
+runtime; FreeBSD uses libudev-devd/libinotify and appropriate evdev/webcamd device
+access. Snap requests the joystick interface; Flatpak requests input devices.
 Platform sandbox/device permissions can still require user setup. Adapter errors
 appear in Settings. Packaging and actual hardware behavior require platform CI
 and physical-device checks; compiling on macOS does not certify them.
@@ -54,12 +53,14 @@ need their own modes/adapters rather than inactive settings. Automated fixtures
 exercise deadzones, response/inversion, button edges/release, explicit conflict
 replacement, bounded camera steps and independent profile persistence.
 
-Camera tilt is measured from nadir (0°) toward the horizon, limited to 85°. The camera
-position/altitude stays fixed; at high altitude the center ray may look into space.
-Middle-drag or the Globe slider also adjusts tilt. R resets heading and tilt; N only
-resets heading. Fly-to smoothly returns to nadir. A saved startup view retains tilt.
-Legacy five-action profiles retain bindings and gain right-stick-Y tilt.
+The lockfile retains libc 0.2.189: FreeBSD CI exposed nix 0.31.3 referring to
+NOTE_PCTRLMASK, removed by libc 0.2.190. This is a targeted compatibility pin in
+the application lockfile; reevaluate it when nix/gilrs publishes a compatible
+update. No dependency source patch or application unsafe code is required.
 
-The SDL switch driver replaces the generic HID interpretation that produced noisy
-USB Pro Controller readings. Physical USB/Bluetooth tests remain required; synthetic
-normalization and neutral-gate tests do not certify a particular controller/firmware.
+Tilt ranges from nadir (0°) to 85° toward the horizon without moving the camera.
+Middle-drag or the Globe slider also adjusts tilt. R resets heading and tilt; N only
+resets heading. Fly-to smoothly returns to nadir. Saved startup views retain tilt.
+Legacy five-action profiles retain bindings and gain right-stick-Y tilt.
+The live monitor uses fixed button rows. Physical USB Pro Controller mapping
+and interactive navigation still require hardware review.

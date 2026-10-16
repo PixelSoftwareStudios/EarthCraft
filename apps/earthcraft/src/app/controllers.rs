@@ -3,34 +3,34 @@ use super::{App, menu::Action};
 use earthcraft_core::controller::{ControllerAction, ControllerMotion, ControllerState};
 use earthcraft_data::settings::controllers::ControllerPreferences;
 use eframe::egui;
-mod backend;
-use backend::Backend;
+use gilrs::{Axis, Button, EventType, GamepadId, Gilrs};
 use std::time::{Duration, Instant};
 const ACTIVE_POLL_INTERVAL: Duration = Duration::from_millis(16);
 const HOTPLUG_POLL_INTERVAL: Duration = Duration::from_millis(250);
+const MAX_EVENTS_PER_FRAME: usize = 512;
 const BIND_TIMEOUT: Duration = Duration::from_secs(10);
 const BIND_AXIS_THRESHOLD: f64 = 0.75;
 const NEUTRAL_THRESHOLD: f64 = 0.2;
-pub(super) const BUTTONS: [&str; 19] = [
-    "South",
-    "East",
-    "North",
-    "West",
-    "LeftTrigger",
-    "RightTrigger",
-    "LeftTrigger2",
-    "RightTrigger2",
-    "Select",
-    "Start",
-    "LeftThumb",
-    "RightThumb",
-    "DPadUp",
-    "DPadDown",
-    "DPadLeft",
-    "DPadRight",
-    "Mode",
-    "C",
-    "Z",
+pub(super) const BUTTONS: [Button; 19] = [
+    Button::South,
+    Button::East,
+    Button::North,
+    Button::West,
+    Button::LeftTrigger,
+    Button::RightTrigger,
+    Button::LeftTrigger2,
+    Button::RightTrigger2,
+    Button::Select,
+    Button::Start,
+    Button::LeftThumb,
+    Button::RightThumb,
+    Button::DPadUp,
+    Button::DPadDown,
+    Button::DPadLeft,
+    Button::DPadRight,
+    Button::Mode,
+    Button::C,
+    Button::Z,
 ];
 pub(super) const AXIS_LABEL_IDS: [&str; 6] = [
     "controllers-left-x",
@@ -41,8 +41,7 @@ pub(super) const AXIS_LABEL_IDS: [&str; 6] = [
     "controllers-right-trigger",
 ];
 pub(super) struct Device {
-    pub(super) id: u32,
-    legacy_suffix: String,
+    pub(super) id: GamepadId,
     pub(super) key: String,
     pub(super) name: String,
     pub(super) state: ControllerState,
@@ -54,7 +53,7 @@ pub(super) struct BindingCapture {
     armed: [bool; 6],
 }
 pub(super) struct Controllers {
-    backend: Option<Backend>,
+    backend: Option<Gilrs>,
     pub(super) devices: Vec<Device>,
     pub(super) error: Option<String>,
     pub(super) capture: Option<BindingCapture>,
@@ -64,14 +63,22 @@ pub(super) struct Controllers {
 }
 impl Controllers {
     pub(super) fn new() -> Self {
-        let (backend, error) = match Backend::new() {
+        let (backend, error) = match Gilrs::new() {
             Ok(backend) => (Some(backend), None),
             Err(error) => (
                 None,
                 Some(format!("Controller initialization failed: {error}")),
             ),
         };
-        let devices = Vec::new();
+        let devices = backend
+            .as_ref()
+            .map(|backend| {
+                backend
+                    .gamepads()
+                    .map(|(id, gamepad)| device(id, gamepad))
+                    .collect()
+            })
+            .unwrap_or_default();
         Self {
             backend,
             devices,
@@ -121,34 +128,65 @@ impl Controllers {
             self.capture = None;
         }
         if let Some(backend) = &mut self.backend {
-            match backend.poll() {
-                Err(error) => {
-                    self.error = Some(format!("Controller polling failed: {error}"));
-                    self.devices.clear();
-                    self.suspended = true;
-                }
-                Ok(mut devices) => {
-                    self.error = None;
-                    migrate_profiles(prefs, &devices);
-                    if prefs.selected.is_empty()
-                        && let Some(device) = devices.first()
-                    {
-                        prefs.selected = device.key.clone();
+            for _ in 0..MAX_EVENTS_PER_FRAME {
+                let Some(event) = backend.next_event() else {
+                    break;
+                };
+                match event.event {
+                    EventType::Connected => {
+                        self.devices.retain(|device| device.id != event.id);
+                        self.devices
+                            .push(device(event.id, backend.gamepad(event.id)));
+                        self.suspended = true;
                     }
-                    for device in &mut devices {
-                        let selected = device.key == prefs.selected;
-                        let old = self.devices.iter().find(|old| old.id == device.id);
-                        if selected && old.is_none() {
-                            self.suspended = true;
+                    EventType::Disconnected => {
+                        if let Some(device) =
+                            self.devices.iter_mut().find(|device| device.id == event.id)
+                        {
+                            device.state.release();
                         }
-                        let profile = prefs.profile(&device.key);
-                        let mut previous = old.map(|old| old.state.clone()).unwrap_or_default();
-                        for input in 0..BUTTONS.len() {
-                            let down = device.state.buttons[input];
-                            let rising = down && !previous.buttons[input];
-                            let action = previous.button(input, down, &profile);
+                        self.devices.retain(|device| device.id != event.id);
+                        self.capture = None;
+                        self.suspended = true;
+                    }
+                    _ => {}
+                }
+                let Some(device) = self.devices.iter_mut().find(|device| device.id == event.id)
+                else {
+                    continue;
+                };
+                let selected = device.key == prefs.selected;
+                match event.event {
+                    EventType::AxisChanged(axis, value, _) => {
+                        if let Some(input) = [
+                            Axis::LeftStickX,
+                            Axis::LeftStickY,
+                            Axis::RightStickX,
+                            Axis::RightStickY,
+                        ]
+                        .iter()
+                        .position(|candidate| *candidate == axis)
+                        {
+                            device.state.axes[input] = f64::from(value);
+                        }
+                    }
+                    EventType::ButtonChanged(button, value, _) => {
+                        if button == Button::LeftTrigger2 {
+                            device.state.axes[4] = f64::from(value);
+                        }
+                        if button == Button::RightTrigger2 {
+                            device.state.axes[5] = f64::from(value);
+                        }
+                    }
+                    EventType::ButtonPressed(button, _) | EventType::ButtonReleased(button, _) => {
+                        let down = matches!(event.event, EventType::ButtonPressed(..));
+                        if let Some(input) =
+                            BUTTONS.iter().position(|candidate| *candidate == button)
+                        {
+                            let profile = prefs.profile(&device.key);
+                            let action = device.state.button(input, down, &profile);
                             if selected
-                                && rising
+                                && down
                                 && self.capture.as_ref().is_some_and(|capture| !capture.axis)
                             {
                                 let capture = self.capture.take().unwrap();
@@ -167,27 +205,23 @@ impl Controllers {
                                 actions.push(action);
                             }
                         }
-                        if selected
-                            && let Some(capture) = &mut self.capture
-                            && capture.axis
-                        {
-                            for (input, value) in device.state.axes.iter().enumerate() {
-                                capture.armed[input] |= value.abs() < NEUTRAL_THRESHOLD;
-                                if capture.armed[input] && value.abs() >= BIND_AXIS_THRESHOLD {
-                                    prefs.profiles.entry(device.key.clone()).or_default().axes
-                                        [capture.action]
-                                        .input = Some(input);
-                                    self.capture = None;
-                                    break;
-                                }
-                            }
+                    }
+                    _ => {}
+                }
+                if selected
+                    && let Some(capture) = &mut self.capture
+                    && capture.axis
+                {
+                    for (input, value) in device.state.axes.iter().enumerate() {
+                        capture.armed[input] |= value.abs() < NEUTRAL_THRESHOLD;
+                        if capture.armed[input] && value.abs() >= BIND_AXIS_THRESHOLD {
+                            prefs.profiles.entry(device.key.clone()).or_default().axes
+                                [capture.action]
+                                .input = Some(input);
+                            self.capture = None;
+                            break;
                         }
                     }
-                    if !devices.iter().any(|device| device.key == prefs.selected) {
-                        self.capture = None;
-                        self.suspended = true;
-                    }
-                    self.devices = devices;
                 }
             }
         }
@@ -220,50 +254,26 @@ impl Controllers {
         (motion, actions)
     }
 }
-fn migrate_profiles(prefs: &mut ControllerPreferences, devices: &[Device]) {
-    for device in devices {
-        let candidates: Vec<_> = prefs
-            .profiles
-            .keys()
-            .filter(|key| !key.starts_with("sdl-") && key.contains(&device.legacy_suffix))
-            .cloned()
-            .collect();
-        let source = candidates
-            .iter()
-            .find(|key| **key == prefs.selected)
-            .or_else(|| (candidates.len() == 1).then(|| &candidates[0]));
-        if let Some(source) = source {
-            // Rename instead of duplicating: migration must not consume the bounded profile budget.
-            if !prefs.profiles.contains_key(&device.key)
-                && let Some(profile) = prefs.profiles.remove(source)
-            {
-                prefs.profiles.insert(device.key.clone(), profile);
-            }
-        }
-        if !prefs.selected.starts_with("sdl-") && prefs.selected.contains(&device.legacy_suffix) {
-            prefs.selected = device.key.clone();
-        }
+fn device(id: GamepadId, gamepad: gilrs::Gamepad<'_>) -> Device {
+    // gilrs UUID identifies a model, not a unique physical serial number.
+    let uuid: String = gamepad
+        .uuid()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let key = format!(
+        "{uuid}-{:04x}-{:04x}-{}",
+        gamepad.vendor_id().unwrap_or_default(),
+        gamepad.product_id().unwrap_or_default(),
+        gamepad.name()
+    );
+    Device {
+        id,
+        key,
+        name: gamepad.name().into(),
+        state: ControllerState::default(),
     }
 }
-
-fn neutral(
-    state: &ControllerState,
-    profile: &earthcraft_core::controller::ControllerProfile,
-) -> bool {
-    profile.axes.iter().all(|binding| {
-        binding.input.is_none_or(|input| {
-            state
-                .axes
-                .get(input)
-                .is_none_or(|value| value.abs() < NEUTRAL_THRESHOLD.max(binding.deadzone))
-        })
-    }) && state
-        .buttons
-        .iter()
-        .zip(profile.buttons)
-        .all(|(down, action)| !down || action == ControllerAction::None)
-}
-
 impl App {
     pub(super) fn controller_input(&mut self, ctx: &egui::Context, height_points: f32) -> bool {
         if ctx.current_pass_index() != 0 {
@@ -323,40 +333,29 @@ impl App {
     }
 }
 
+fn neutral(
+    state: &ControllerState,
+    profile: &earthcraft_core::controller::ControllerProfile,
+) -> bool {
+    profile.axes.iter().all(|binding| {
+        binding.input.is_none_or(|input| {
+            state
+                .axes
+                .get(input)
+                .is_none_or(|value| value.abs() < NEUTRAL_THRESHOLD.max(binding.deadzone))
+        })
+    }) && state
+        .buttons
+        .iter()
+        .zip(profile.buttons)
+        .all(|(down, action)| !down || action == ControllerAction::None)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
     use earthcraft_core::controller::ControllerProfile;
     #[test]
-    fn migrating_connected_models_keeps_profiles_without_duplicating_the_budget() {
-        let mut prefs = ControllerPreferences::default();
-        let mut devices = Vec::new();
-        for (id, product) in [(1, "2009"), (2, "1234")] {
-            let old = format!("uuid-057e-{product}-Pro Controller");
-            let mut profile = ControllerProfile::default();
-            profile.axes[0].sensitivity = f64::from(id);
-            prefs.profiles.insert(old.clone(), profile);
-            if id == 1 {
-                prefs.selected = old;
-            }
-            devices.push(Device {
-                id,
-                key: format!("sdl-model-{product}"),
-                legacy_suffix: format!("-057e-{product}-"),
-                name: "Pro Controller".into(),
-                state: ControllerState::default(),
-            });
-        }
-        migrate_profiles(&mut prefs, &devices);
-        assert_eq!(prefs.profiles.len(), 2);
-        assert_eq!(prefs.selected, "sdl-model-2009");
-        assert_eq!(prefs.profile("sdl-model-2009").axes[0].sensitivity, 1.0);
-        assert_eq!(prefs.profile("sdl-model-1234").axes[0].sensitivity, 2.0);
-        migrate_profiles(&mut prefs, &devices);
-        assert_eq!(prefs.profiles.len(), 2);
-    }
-    #[test]
-    fn neutral_gate_ignores_unbound_axes_and_buttons_but_requires_bound_controls_released() {
+    fn neutral_gate_ignores_unbound_controls_and_requires_bound_controls_released() {
         let mut state = ControllerState::default();
         let mut profile = ControllerProfile::default();
         assert!(neutral(&state, &profile));

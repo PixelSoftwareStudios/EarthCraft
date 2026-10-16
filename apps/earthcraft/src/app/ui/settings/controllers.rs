@@ -59,7 +59,7 @@ impl App {
             ui.label(lang.format(
                 "controllers-conflict",
                 &[
-                    ("button", BUTTONS[target].into()),
+                    ("button", format!("{:?}", BUTTONS[target]).into()),
                     (
                         "action",
                         lang.text(profile.buttons[target].label_id()).into(),
@@ -136,7 +136,7 @@ impl App {
         for (input, logical) in profile.buttons.iter_mut().enumerate() {
             ui.push_id(("button", input), |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(BUTTONS[input]);
+                    ui.label(format!("{:?}", BUTTONS[input]));
                     egui::ComboBox::from_id_salt("action")
                         .selected_text(lang.text(logical.label_id()))
                         .show_ui(ui, |ui| {
@@ -179,7 +179,7 @@ fn live_monitor(
         .num_columns(2)
         .show(ui, |ui| {
             for (input, label) in BUTTONS.iter().enumerate() {
-                ui.label(*label);
+                ui.label(format!("{label:?}"));
                 ui.label(lang.text(if state.buttons[input] {
                     "controllers-pressed"
                 } else {

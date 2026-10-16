@@ -6,8 +6,7 @@ so reviewers can distinguish behavior changes from file organization.
 
 ## Development
 
-Install Rust 1.95 or newer through rustup. Native builds also require CMake and a C/C++ compiler
-for the statically linked SDL3 gamepad/HID backend. Eframe owns all windows and presentation. The locked dependency graph includes
+Install Rust 1.95 or newer through rustup. The locked dependency graph includes
 eframe/egui 0.36, which require Rust 1.95.
 The workspace uses Edition 2024 and declares Rust 1.95; CI checks stable on
 Ubuntu. Stable is suitable for day-to-day development; do not use APIs newer than
